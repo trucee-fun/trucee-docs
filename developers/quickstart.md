@@ -23,10 +23,9 @@ The file is `gitbook/examples/quickstart.ts` in the Trucee source, and this page
 {% endhint %}
 
 {% hint style="info" %}
-**What works today.** Every SDK function on this page is part of the SDK's frozen public API (pinned by `sdk/test/contract.test.ts`), which is why the example already typechecks.
+**What works today.** Every SDK call in the example is implemented, and the SDK's public API is pinned by its contract test (`sdk/test/contract.test.ts`).
 
-* **Implemented:** `getClusterConfig`, the account reads (`fetchAllMarkets`, `fetchMarket`, `fetchPositionsByOwner`), `marketAccountsFor`, the instruction builders (`buyInstructions`, `sellInstructions`, `finalizeInstruction`, `claimSurplusInstruction`), `parseRouterEvents` and `decodeTxError`.
-* **In progress:** the quotes (`quoteBuy`, `quoteExit`, `floorValue`) and the launch builders (`buildLaunchPlan`, `buildZeroPvpConfigParameters`). Until they land they throw `not implemented: <function>`, so a run of the example stops at the first one it reaches.
+The SDK also has Auto-Exit builders (`setAutoExitInstructions` and `autoExitInstruction`). Auto-Exit is merged in the router source but not deployed to devnet yet, so this quickstart leaves it out.
 {% endhint %}
 
 ## Install
@@ -69,7 +68,9 @@ Depend on the SDK folder and install its peer dependencies yourself, on the rang
 ```
 
 * The SDK is an ES module (`"type": "module"` with import-only `exports`), so import it from ES module code or through a bundler.
-* npm installs a `file:` dependency as a symlink. Set `"preserveSymlinks": true` in `tsconfig.json` and run Node with `--preserve-symlinks`, so the SDK resolves `@solana/web3.js` and its other peers from your project's `node_modules` rather than from the SDK folder, and you get one copy of each library. `gitbook/examples/tsconfig.json` and the example's `quickstart` script do exactly this.
+* npm installs a `file:` dependency as a symlink. Node and TypeScript then resolve the SDK's own imports (`@solana/web3.js` and its other peers) from the SDK folder's `node_modules`, which exists once you have built the SDK, so your script can load two copies of `@solana/web3.js`. TypeScript treats two copies of the same version as one package, and the SDK's builders accept public keys from either copy, so the example works this way. An `instanceof` check between an SDK object and your own import fails, though.
+* For a single copy, install the SDK as a packed copy instead of a symlink with `npm install --install-links`, and re-run it after every SDK rebuild.
+* The example's `tsconfig.json` sets `preserveSymlinks` and its `quickstart` script runs Node with `--preserve-symlinks`: if the SDK folder has no `node_modules`, the SDK's imports then resolve from the example's own.
 * Every token and quote amount in the SDK is a `bigint` in raw base units (lamports for SOL).
 
 ## The example
@@ -116,7 +117,8 @@ const RPC_URL = 'https://api.devnet.solana.com'
 const BUY_AMOUNT = 10_000_000n // 0.01 SOL in lamports: SDK amounts are bigints in raw base units
 const SLIPPAGE_BPS = 100n // accept up to 1% fewer tokens than quoted
 const BPS = 10_000n
-const LAUNCH_THRESHOLD = 1_000_000_000n // graduate once 1 SOL of quote sits in the curve
+const QUOTE_TOLERANCE = 1n // quoteBuy's tokensOut can be 1 raw unit above what the buy receives on-chain
+const LAUNCH_THRESHOLD = 1_000_000_000n // graduate at 1 SOL in the curve (the router caps SOL at 10)
 const LAUNCH_FEE_BPS = 100 // 1% trading fee
 
 const cluster = getClusterConfig('devnet') // program ids and allowed quote mints (devnet: SOL only)
@@ -185,8 +187,9 @@ async function buildBuy(
   recent: BlockhashWithExpiryBlockHeight,
 ): Promise<Transaction> {
   const quote = quoteOf(market)
-  const buy = await quoteBuy(connection, market, BUY_AMOUNT)
-  const minOut = (buy.tokensOut * (BPS - SLIPPAGE_BPS)) / BPS
+  const buy = await quoteBuy(connection, market, BUY_AMOUNT) // throws once the curve is complete
+  const expected = buy.tokensOut > QUOTE_TOLERANCE ? buy.tokensOut - QUOTE_TOLERANCE : 0n
+  const minOut = (expected * (BPS - SLIPPAGE_BPS)) / BPS
   const amount = (raw: bigint): string => formatAmount(raw, quote)
   console.log(`buy ${amount(BUY_AMOUNT)}: ${buy.tokensOut} tokens (raw), fee ${amount(buy.fee)}`)
   console.log(`  into the curve ${amount(buy.netIntoCurve)}, cost basis +${amount(buy.basisAdded)}`)
@@ -240,9 +243,6 @@ async function buildExit(
 async function buildLaunch(creator: PublicKey): Promise<LaunchPlan> {
   const sol = cluster.quoteMints.find((info) => info.symbol === 'SOL')
   if (sol === undefined) throw new Error(`SOL is not a quote mint on ${cluster.cluster}`)
-  if (LAUNCH_THRESHOLD > sol.maxMigrationQuoteThreshold) {
-    throw new Error(`Threshold above the router cap of ${formatAmount(sol.maxMigrationQuoteThreshold, sol)}`)
-  }
   const plan = await buildLaunchPlan({
     connection,
     cluster,
@@ -263,19 +263,13 @@ async function buildLaunch(creator: PublicKey): Promise<LaunchPlan> {
   return plan
 }
 
-/** Re-wraps each planned transaction, adds its extra signers (signers[i] sign transactions[i]), signs. */
-async function signLaunchPlan(
-  plan: LaunchPlan,
-  creator: PublicKey,
-  sign: SignTransaction,
-  recent: BlockhashWithExpiryBlockHeight,
-): Promise<Transaction[]> {
+/** The plan sets the creator as fee payer and a recent blockhash; signers[i] co-sign transactions[i]. */
+async function signLaunchPlan(plan: LaunchPlan, sign: SignTransaction): Promise<Transaction[]> {
   const signed: Transaction[] = []
-  for (const [i, planned] of plan.transactions.entries()) {
-    const tx = toTransaction(creator, recent, planned.instructions)
+  for (const [i, tx] of plan.transactions.entries()) {
     const extraSigners = plan.signers[i] ?? []
-    if (extraSigners.length > 0) tx.partialSign(...extraSigners)
-    signed.push(await sign(tx)) // one at a time, like wallet prompts
+    if (extraSigners.length > 0) tx.partialSign(...extraSigners) // the new config and mint keypairs
+    signed.push(await sign(tx)) // one at a time, in order: they must also be sent in this order
   }
   return signed
 }
@@ -298,7 +292,7 @@ async function main(): Promise<void> {
     console.log(`exit transaction: ${exitTx.instructions.length} instructions, for the owner to sign`)
   }
 
-  const launchTxs = await signLaunchPlan(await buildLaunch(user.publicKey), user.publicKey, sign, recent)
+  const launchTxs = await signLaunchPlan(await buildLaunch(user.publicKey), sign)
   console.log(`launch: ${launchTxs.length} transactions signed, not sent`)
 }
 
@@ -330,9 +324,16 @@ try {
 
 ### 2. Quote a buy and build it
 
-`quoteBuy(connection, market, amountIn)` quotes a router buy of `amountIn` quote units and returns `tokensOut`, `fee`, `netIntoCurve` and `basisAdded`. `basisAdded` is the cost basis the buy adds to your position: the router records the quote that entered the curve minus 16 base units (`DUST_PER_BUY`), which absorbs DBC's rounding (`zpvp/programs/zpvp_router/src/math.rs`).
+`quoteBuy(connection, market, amountIn)` quotes a router buy of `amountIn` quote units. It reads the market's DBC pool and config, checks that they belong together and collect the fee in the quote token, and runs the DBC SDK's partial-fill swap quote, the same swap mode the router uses. It returns:
 
-The example accepts up to 1% fewer tokens than quoted (`minOut`) and calls `buyInstructions`, which returns, in order:
+* `tokensOut`: the tokens you receive;
+* `fee`: the trading fee, charged on the input;
+* `netIntoCurve`: the quote that enters the curve (`amountIn − fee` when the buy fills completely);
+* `basisAdded`: the cost basis the buy adds to your position. The router records the quote that entered the curve minus 16 base units (`DUST_PER_BUY`), which absorbs DBC's rounding (`zpvp/programs/zpvp_router/src/math.rs`).
+
+On the buy that completes the curve, DBC takes only the input it needs, and `fee` and `netIntoCurve` cover just that part. Once the curve is complete `quoteBuy` throws, because buys are closed (`sdk/src/quote.ts`).
+
+DBC rounds in the pool's favour, so `tokensOut` can be 1 raw unit above what the buy receives on-chain (the tolerance in `sdk/test/quote.test.ts`). The example takes that unit off before it applies its 1% slippage, so `minOut` always stays below the quote. It then calls `buyInstructions`, which returns, in order:
 
 1. the idempotent creation of your quote token account and of your Token-2022 base token account;
 2. for a SOL quote, a transfer of exactly `amountIn` lamports into your wSOL account and a `syncNative`;
@@ -348,7 +349,7 @@ The example accepts up to 1% fewer tokens than quoted (`minOut`) and calls `buyI
 
 `fetchPositionsByOwner(connection, owner)` returns a wallet's router `Position` accounts (one per market and owner) with `tokens` and `basis`.
 
-`quoteExit(position, market, tokens)` returns what an exit of `tokens` refunds. Each field follows the router's refund rule in `zpvp/programs/zpvp_router/src/math.rs`:
+`quoteExit(position, market, tokens)` returns what an exit of `tokens` refunds. It throws a `RangeError` when `tokens` is 0 or above the position, the case where the router fails with `InvalidExitAmount`. Each field follows the router's refund rule in `zpvp/programs/zpvp_router/src/math.rs`:
 
 | Field | Router rule |
 | --- | --- |
@@ -362,18 +363,26 @@ The example accepts up to 1% fewer tokens than quoted (`minOut`) and calls `buyI
 
 ### 4. Build a launch plan
 
-`buildLaunchPlan(params)` returns the transactions that create the DBC config, the DBC pool and the router market for a new token, together with the `config`, `pool`, `baseMint` and `market` addresses. `signers[i]` are the extra signers of `transactions[i]`. The example rebuilds each transaction with the creator as fee payer and a recent blockhash, adds its extra signers, then lets the creator sign.
+`buildLaunchPlan(params)` returns three transactions to send in this order, together with the new `config`, `pool`, `baseMint` and `market` addresses:
+
+1. create the DBC config (extra signer: a new config keypair);
+2. create the DBC pool with the token's `name`, `symbol` and `uri` metadata (extra signer: the new base mint keypair);
+3. write the hook's extra-account list and open the router market, plus the creator's first buy when you pass `initialBuy` (it is then the pool's first possible trade).
+
+Every transaction already has the creator as fee payer and a recent blockhash, and fits in one packet. `signers[i]` are the extra signers of `transactions[i]`: the example adds them, then lets the creator sign. Metadata limits are 32 bytes for `name`, 10 for `symbol` and 200 for `uri` (`sdk/src/launch.ts`).
 
 The `preset` options describe the Zero-PvP DBC config:
 
 | Option | Meaning |
 | --- | --- |
 | `quote` | A `QuoteMintInfo` from the cluster config (on devnet: SOL). |
-| `migrationQuoteThreshold` | The quote raised at which the curve graduates, in raw units. The router caps it per quote mint (`QUOTE_CAPS`): 10 SOL, 5 TSLAx or 10 NVDAx. |
-| `feeBps` | The trading fee in basis points. |
-| `feeClaimer`, `leftoverReceiver` | The DBC config's fee claimer and leftover receiver. |
+| `migrationQuoteThreshold` | The quote raised at which the curve graduates, in raw units. The router caps it per quote mint (`QUOTE_CAPS`): 10 SOL, 5 TSLAx or 10 NVDAx. The SDK throws above the cap. |
+| `feeBps` | The static trading fee in basis points: `feeNumerator = feeBps × 100,000`, so 100 bps is 10,000,000 (1%). |
+| `feeClaimer`, `leftoverReceiver` | The DBC config's fee claimer and leftover receiver. Both must be wallet addresses; the SDK rejects a PDA. |
+| `totalTokenSupply` | Optional, in raw units of the 6-decimal base token. Default: 1,000,000,000 tokens. |
+| `percentageSupplyOnMigration` | Optional. Default: 20% of the supply. |
 
-`PresetOptions` in `sdk/src/types.ts` has two more optional fields, `totalTokenSupply` and `percentageSupplyOnMigration`. If you create configs with your own DBC tooling, `buildZeroPvpConfigParameters(preset)` returns just the DBC `ConfigParameters` for a transfer-hook pool the router accepts.
+The preset gives the creator no token allocation (no locked vesting), migrates to a Meteora DAMM v2 pool and locks all of the migrated liquidity permanently. If you create configs with your own DBC tooling, `buildZeroPvpConfigParameters(preset)` returns just the DBC `ConfigParameters`.
 
 The router only opens a market for a config that:
 
@@ -383,7 +392,7 @@ The router only opens a market for a config that:
 
 ### Sign
 
-`SignTransaction` has the same shape as a wallet adapter's `signTransaction`. The example signs with `keypairSigner`, a local keypair; in a browser app you pass `useWallet().signTransaction` from the Solana wallet adapter instead. The example stops there: to go live, send the signed transactions with your usual `@solana/web3.js` flow.
+`SignTransaction` has the same shape as a wallet adapter's `signTransaction`. The example signs with `keypairSigner`, a local keypair; in a browser app you pass `useWallet().signTransaction` from the Solana wallet adapter instead. The example stops there. To go live, send the signed transactions with your usual `@solana/web3.js` flow, the launch transactions in the order of the plan.
 
 ## Errors
 
@@ -412,7 +421,7 @@ When the swap that completes the curve runs, DBC revokes the transfer hook and t
 * `finalizeInstruction({ cluster, market, pool, bufferVault })` snapshots the buffer surplus and the open cost basis once the curve is complete.
 * `claimSurplusInstruction({ cluster, accounts, cranker, owner })` pays a holder's share of the surplus. Anyone can sign as `cranker`; the share always goes to the owner's canonical quote token account and the position's rent to the owner.
 
-`parseRouterEvents(logs)` decodes the router's `BuyEvent`, `SellEvent`, `ClaimEvent` and `FinalizeEvent` from a transaction's log messages.
+`parseRouterEvents(logs)` decodes the router's events from a transaction's log messages: `BuyEvent`, `SellEvent`, `ClaimEvent` and `FinalizeEvent`, plus `AutoExitSetEvent` and `AutoExitEvent` from Auto-Exit.
 
 ## Next steps
 

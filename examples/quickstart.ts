@@ -38,7 +38,8 @@ const RPC_URL = 'https://api.devnet.solana.com'
 const BUY_AMOUNT = 10_000_000n // 0.01 SOL in lamports: SDK amounts are bigints in raw base units
 const SLIPPAGE_BPS = 100n // accept up to 1% fewer tokens than quoted
 const BPS = 10_000n
-const LAUNCH_THRESHOLD = 1_000_000_000n // graduate once 1 SOL of quote sits in the curve
+const QUOTE_TOLERANCE = 1n // quoteBuy's tokensOut can be 1 raw unit above what the buy receives on-chain
+const LAUNCH_THRESHOLD = 1_000_000_000n // graduate at 1 SOL in the curve (the router caps SOL at 10)
 const LAUNCH_FEE_BPS = 100 // 1% trading fee
 
 const cluster = getClusterConfig('devnet') // program ids and allowed quote mints (devnet: SOL only)
@@ -107,8 +108,9 @@ async function buildBuy(
   recent: BlockhashWithExpiryBlockHeight,
 ): Promise<Transaction> {
   const quote = quoteOf(market)
-  const buy = await quoteBuy(connection, market, BUY_AMOUNT)
-  const minOut = (buy.tokensOut * (BPS - SLIPPAGE_BPS)) / BPS
+  const buy = await quoteBuy(connection, market, BUY_AMOUNT) // throws once the curve is complete
+  const expected = buy.tokensOut > QUOTE_TOLERANCE ? buy.tokensOut - QUOTE_TOLERANCE : 0n
+  const minOut = (expected * (BPS - SLIPPAGE_BPS)) / BPS
   const amount = (raw: bigint): string => formatAmount(raw, quote)
   console.log(`buy ${amount(BUY_AMOUNT)}: ${buy.tokensOut} tokens (raw), fee ${amount(buy.fee)}`)
   console.log(`  into the curve ${amount(buy.netIntoCurve)}, cost basis +${amount(buy.basisAdded)}`)
@@ -162,9 +164,6 @@ async function buildExit(
 async function buildLaunch(creator: PublicKey): Promise<LaunchPlan> {
   const sol = cluster.quoteMints.find((info) => info.symbol === 'SOL')
   if (sol === undefined) throw new Error(`SOL is not a quote mint on ${cluster.cluster}`)
-  if (LAUNCH_THRESHOLD > sol.maxMigrationQuoteThreshold) {
-    throw new Error(`Threshold above the router cap of ${formatAmount(sol.maxMigrationQuoteThreshold, sol)}`)
-  }
   const plan = await buildLaunchPlan({
     connection,
     cluster,
@@ -185,19 +184,13 @@ async function buildLaunch(creator: PublicKey): Promise<LaunchPlan> {
   return plan
 }
 
-/** Re-wraps each planned transaction, adds its extra signers (signers[i] sign transactions[i]), signs. */
-async function signLaunchPlan(
-  plan: LaunchPlan,
-  creator: PublicKey,
-  sign: SignTransaction,
-  recent: BlockhashWithExpiryBlockHeight,
-): Promise<Transaction[]> {
+/** The plan sets the creator as fee payer and a recent blockhash; signers[i] co-sign transactions[i]. */
+async function signLaunchPlan(plan: LaunchPlan, sign: SignTransaction): Promise<Transaction[]> {
   const signed: Transaction[] = []
-  for (const [i, planned] of plan.transactions.entries()) {
-    const tx = toTransaction(creator, recent, planned.instructions)
+  for (const [i, tx] of plan.transactions.entries()) {
     const extraSigners = plan.signers[i] ?? []
-    if (extraSigners.length > 0) tx.partialSign(...extraSigners)
-    signed.push(await sign(tx)) // one at a time, like wallet prompts
+    if (extraSigners.length > 0) tx.partialSign(...extraSigners) // the new config and mint keypairs
+    signed.push(await sign(tx)) // one at a time, in order: they must also be sent in this order
   }
   return signed
 }
@@ -220,7 +213,7 @@ async function main(): Promise<void> {
     console.log(`exit transaction: ${exitTx.instructions.length} instructions, for the owner to sign`)
   }
 
-  const launchTxs = await signLaunchPlan(await buildLaunch(user.publicKey), user.publicKey, sign, recent)
+  const launchTxs = await signLaunchPlan(await buildLaunch(user.publicKey), sign)
   console.log(`launch: ${launchTxs.length} transactions signed, not sent`)
 }
 
