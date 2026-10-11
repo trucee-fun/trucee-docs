@@ -74,8 +74,8 @@ Your wallet signs the three transactions and pays their network fees and rent. K
 ### If a launch is interrupted
 
 * **Before the pool exists.** No token has been created yet. Start again.
-* **Someone opened your market first.** Anyone may write the hook's extra-account list and call `init_market`. If someone else does it between your pool and market transactions, your market transaction fails with "account already in use". The app then rebuilds the launch once with the same keys, skips every account that already exists, and sends only what is left. The other party's market is the same market you would have opened, because every field comes from your pool and config. If the market was already open and your initial buy has not been placed yet, the app first shows a fresh quote and asks whether to place it. If you decline, your token and market are live and the buy is not sent. The resumed buy sets no minimum output, so that confirmation is your only price check.
-* **Any other failure after the pool exists.** The app does not retry, because a transaction that expired or "may still land" could still land. It tells you the token is only partly created and links to the token's page.
+* **Someone opened your market first.** Anyone may write the hook's extra-account list and call `init_market`. If someone else does it between your pool and market transactions, your market transaction fails with "account already in use". The app then rebuilds the launch once with the same keys, skips every account that already exists, and sends only what is left. The other party's market is the same market you would have opened, because every field comes from your pool and config. If the market was already open and your initial buy has not been placed yet, the app first shows a fresh quote and asks whether to place it. If you decline, your token and market are live and the buy is not sent. If you confirm, the app rebuilds the buy with a minimum output of the confirmed quote less 1% (`RESUME_SLIPPAGE_BPS` = 100) and then sends it. If the price has moved further by then, DBC rejects the buy with `ExceededSlippage`, and no tokens are bought at the worse price.
+* **Any other failure after the pool exists.** This includes a resumed buy that DBC rejects. The app does not retry, because a transaction that expired or "may still land" could still land. It reports the failure and links to your token's page, since the config and pool are already on chain.
 
 ## What the preset fixes
 
@@ -120,7 +120,7 @@ The same rate sets your holders' exit cost: each refund is cut by the fee at cos
 
 **Example:** a 1 SOL buy at 1% pays a 0.01 SOL fee. Meteora's share is 0.002 SOL, of which 0.0004 SOL goes to a referrer if there is one. The other 0.008 SOL goes to your wallet as the fee claimer. A referrer never reduces the buyer's basis or your share ([Programs reference → Native Referral](developers/programs.md#native-referral-v5)).
 
-Your share accrues in the DBC pool, and the fee claimer withdraws it with DBC's own fee-claim instruction. Trucee's app and SDK do not build that transaction.
+Your share accrues in the DBC pool, and the fee claimer withdraws it with DBC's own `claim_trading_fee` instruction. Trucee's app and SDK do not build that transaction.
 
 ### What you do not earn
 
@@ -129,7 +129,7 @@ Your share accrues in the DBC pool, and the fee claimer withdraws it with DBC's 
 * **Tokens.** You have no allocation. Any tokens you hold, you bought on the curve.
 
 {% hint style="info" %}
-**There is no retention fee today.** Beyond the 80% fee-claimer share above, creators earn nothing from trading. A Retention Fee is listed on the [Roadmap](roadmap.md#retention-fee). It is not merged, and nothing on this page depends on it.
+**There is no retention fee today.** Beyond the 80% fee-claimer share above, creators earn nothing from trading. A Retention Fee is listed on the [Roadmap](roadmap.md#retention-fee). Only its first part is merged in the router source: `init_market` recognizes a market that opts in by naming the router's fee PDA as fee claimer. Nothing pays a retention fee yet. The fee settlement is not merged, none of it is on devnet, and launches from the app do not opt in. Nothing on this page depends on it.
 {% endhint %}
 
 After migration, the token trades in a Meteora DAMM v2 pool under DAMM v2's own fee rules. Trucee plays no part in them.
@@ -149,14 +149,15 @@ Paths are relative to the root of the Trucee monorepo.
 | Form fields, limits and messages | `app/src/components/launch/launch-schema.ts`, `launch-form.tsx`; server re-checks in `app/src/lib/server/metadata-store.ts` |
 | Metadata stored by the app on devnet | `app/src/lib/server/metadata-store.ts`; `docs/trucee-plan.md` (decision log, tech stack) |
 | Four steps, three signatures, keys kept in memory, the token page opens | `app/src/components/launch/launch-steps.tsx`, `launch-container.tsx`; `app/src/lib/launch/run-launch.ts` |
-| Resume after "already in use", fresh-price confirmation, no retry of other failures, no minimum output on a resumed buy | `app/src/lib/launch/run-launch.ts` (header, `resumeAfterFailure`, `confirmFreshPrice`); `sdk/src/launch.ts` (`buildLaunchPlan`); `docs/trucee-plan.md` (decision log, "Market-init front-running") |
+| Resume after "already in use", fresh-price confirmation, no retry of other failures, link to the token page once config and pool exist | `app/src/lib/launch/run-launch.ts` (header, `resumeAfterFailure`, `confirmFreshPrice`, `LaunchPartialError`); `sdk/src/launch.ts` (`buildLaunchPlan`); `docs/trucee-plan.md` (decision log, "Market-init front-running") |
+| Resumed buy bounded at the confirmed quote less 1%, rejected by DBC with `ExceededSlippage` below that | `app/src/lib/launch/run-launch.ts` (`RESUME_SLIPPAGE_BPS`, `resumeMinOut`, `resumeLaunch`); `sdk/src/launch.ts` (`LaunchParams.initialBuyMinOut`, `buildLaunchPlan`) |
 | 1% fee; fee claimer and leftover receiver are the creator's wallet | `app/src/lib/launch/run-launch.ts` (`LAUNCH_FEE_BPS`, `launchParams`) |
 | Preset values, SDK defaults, pool-creator share 0, pool-creation fee 0 | `sdk/src/launch.ts` (`curveParams`, `presetRules`, `zeroPvpConfigParameters`) |
 | Router checks and error codes | `zpvp/programs/zpvp_router/src/preset.rs`, `dbc.rs` (`read_config`), `lib.rs` (`init_market`, `check_launch_caps`); `docs/security-review-v5.md` |
 | Quote tokens, decimals, caps and clusters | `QUOTE_CAPS` in `zpvp/programs/zpvp_router/src/lib.rs`; `sdk/src/constants.ts` |
 | Anti-Whale cap, five positions, 0.015 SOL buying 18.6% on the devnet test curve | `ANTI_WHALE_BPS` in `zpvp/programs/zpvp_router/src/lib.rs`; `docs/trucee-plan.md` (section 3 and decision log) |
-| Trading-fee split: 20% protocol, referral 20% of the protocol share, 80% to the fee claimer | `docs/trucee-plan.md` (sections 4 and 5, "Fee split facts") |
+| Trading-fee split: 20% protocol, referral 20% of the protocol share, 80% to the fee claimer, claimed with DBC `claim_trading_fee` | `docs/trucee-plan.md` (sections 4 and 5, "Fee split facts"); `fee_claimer` doc comment in `zpvp/programs/zpvp_router/src/dbc.rs` |
 | xStock issuer powers | `docs/trucee-plan.md` (section 1); comment on `QUOTE_CAPS` |
 | Keepers migrate SOL pools only from 10 SOL; crank skips mainnet SOL pools below 1 SOL | `docs/trucee-plan.md` (After the freeze, decision log); `docs/research/RSC-03.md`; `worker/src/config.ts` |
 | Router v5 (capped build) runs on devnet | `docs/submission.md` ("Router v5 on devnet (ONC-09)"); `litesvm-diff/out/e2e_devnet_v6.json` |
-| No retention fee shipped | `docs/trucee-plan.md` (section 5 and decision log): Retention Fee is not merged |
+| No retention fee shipped: only the opt-in is merged, nothing settles or pays the fee, the app does not opt in | `check_retention_preset` and `fee_authority` in `zpvp/programs/zpvp_router/src/lib.rs` (commit `b3e5d99`); `docs/trucee-plan.md` (section 5 and decision log); `feeClaimer` in `app/src/lib/launch/run-launch.ts` |
