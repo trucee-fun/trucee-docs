@@ -169,6 +169,25 @@ Devnet runs the capped router build without the v5 features. Its upgrade transac
 
 ### Which wallets work?
 
-No wallet is verified yet. We are testing compatibility with Phantom, Backpack and Solflare, specifically signing router transactions for Token-2022 transfer-hook tokens. This answer will list the results once the tests are done.
+Buys and exits are ordinary transactions that Phantom, Solflare and Backpack can sign; we verified them by simulation on devnet and in a test environment with the wallets' guard instructions, and a hands-on check with each wallet is pending.
 
-Whatever wallet you use, its own Send and Swap features will fail for a Trucee token until graduation, because the hook rejects any transfer that does not come through the router. Buys and exits go through the Trucee router, which the Trucee app and SDK call for you. Both the app and the SDK are still in development. After graduation, the token works like any other Token-2022 token.
+* **Simulation on devnet.** A router buy against a live devnet market whose token has the transfer hook, with extra instructions before and after it, simulated with no error. The hook ran and passed. Wallet previews simulate the same kind of transaction before you sign.
+* **Test environment (LiteSVM).** Router buys and exits passed with extra instructions placed before them, after them, or both, including the real Lighthouse program that Phantom and Solflare use for their guard instructions. Transfers that did not come through the router still failed with `TransferNotViaRouter`. The run passed 15 checks with 0 failures.
+
+The wallet does not have to handle the hook itself. Every buy and exit already carries the hook's extra accounts, which the router's instructions include for you. The hook looks at the top-level instruction that is running, not at the other instructions in the transaction, so instructions that a wallet adds do not affect it.
+
+**Guard instructions.** Phantom and Solflare may append their own safety checks ("guard instructions") after the Trucee instructions; Backpack adds none. A guard checks that the result on-chain matches the preview. If the curve moves between your preview and execution, for example because another buy lands in between, a guard can fail. The whole transaction then fails and the buy does not happen; just try again.
+
+**Smart-contract wallets cannot trade before graduation.** Multisig and other smart-contract wallets, such as a Squads vault, call the router from their own program. The router is then not the top-level instruction, so the hook rejects the transfer. This follows from the hook's code; it was not tested with a real smart-contract wallet.
+
+**Pending: the hands-on check.** The Trucee team will try a buy and an exit at cost by hand with each of Phantom, Solflare and Backpack on devnet. That check has to run from a hosted HTTPS site, because Phantom does not add its guard instructions on `localhost`. It will also show how each wallet's preview labels a new Token-2022 token, and whether Phantom shows its warning for a domain it has not reviewed yet. This answer will list the results once the check is done.
+
+Buys and exits go through the Trucee router, which the Trucee app and SDK call for you. Both the app and the SDK are still in development. After graduation, the token works like any other Token-2022 token.
+
+*Source: `docs/research/RSC-01.md` (Answer, E1, E2, E4, E6, owner check); `litesvm-diff/src/rsc01_injected_ixs.ts`; `programs/zpvp_hook/src/lib.rs` (`transfer_hook` reads `get_instruction_relative(0)`); `sdk/src/instructions.ts` (`routerSwapInstruction`).*
+
+### Why does my wallet's Send or Swap fail for a Trucee token before graduation?
+
+Before graduation, a Trucee token moves through the Trucee router and nowhere else: you can buy, or exit at cost. Your wallet's own Send or Swap is blocked on purpose, so you will see a failed simulation there. For example, Phantom's Send adds the hook's accounts to the transfer, so the transfer reaches the hook, and the hook rejects it with `TransferNotViaRouter` ("Pre-graduation transfers must go through the Zero-PvP router"). After graduation DBC removes the lock on-chain, and the token works like any other Token-2022 token. See [Why can't I transfer my tokens before graduation?](#why-cant-i-transfer-my-tokens-before-graduation).
+
+*Source: `docs/research/RSC-01.md` (Answer, E2, E5); `programs/zpvp_hook/src/lib.rs` (`TransferNotViaRouter`).*
