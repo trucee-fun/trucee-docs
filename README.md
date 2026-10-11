@@ -8,7 +8,7 @@ description: >-
 
 **No PvP until graduation.**
 
-Trucee is a Zero-PvP bonding curve built on [Meteora's Dynamic Bonding Curve](https://docs.meteora.ag/core-products/dbc/what-is-dbc) (DBC). Before a token graduates, every buyer can exit at their cost basis, so nobody can profit off other buyers until the curve completes. Think of it as pump.fun without victims.
+Trucee is a Zero-PvP bonding curve built on [Meteora's Dynamic Bonding Curve](https://docs.meteora.ag/core-products/dbc/what-is-dbc) (DBC). Before a token graduates, every buyer can exit at their cost basis, so nobody can profit off other buyers until the curve completes. Think of it as a launchpad without victims.
 
 {% hint style="warning" %}
 **Status:** the Trucee programs run on Solana devnet. They are unaudited and not deployed to mainnet yet. See the [Roadmap](roadmap.md).
@@ -20,7 +20,6 @@ On a bonding curve every buy raises the price and every sell lowers it. Before g
 
 * **Snipers win, later buyers pay.** On the same simulated order flow (300 random curves, 1% fee, a sniper buying first, 60 retail buys), a sniper extracts **+10.57 SOL** on average from a plain DBC curve. Through the Trucee router the same sniper averages **−0.06 SOL** and never profits in any of the 300 runs. This is a simulation, not a replay of real pools (`sim/sniper_report.py`, seed 42).
 * **Few curves see real competition.** Of 94,332 DBC graduations in the 30 days to 2026-09-29, [Litmus](https://github.com/omreor/litmus) counts 495 as *contested* (independent buyers competed to fill the curve) and 93,769 as *uncontested* (filled without real competition, for example by the creator, the launchpad's own wallet or one bundle).
-* **A rug with a name like ours.** In April 2026 a pump.fun token whose ticker resembles our name rugged −94%. That token is not Trucee: Trucee is the name of a product, not a ticker.
 
 ## What Trucee changes
 
