@@ -9,9 +9,9 @@ This page covers the rules the two Trucee programs enforce, the tests behind the
 | Item | Status | Source |
 |---|---|---|
 | Programs | `zpvp_hook` (Token-2022 transfer hook) and `zpvp_router` (cost-basis router), Anchor 0.32.1 | `zpvp/Anchor.toml`, `zpvp/programs/` |
-| Deployed | Devnet only. The devnet router runs the capped build of commit `dd7cc10`. Auto-Exit and the Anti-Whale cap are merged and tested in LiteSVM but are not on devnet yet | `solana program show`, commit `96767fb` |
+| Deployed | Devnet only. The devnet router runs router v5, the capped build of commit `3985d1f`, with Auto-Exit, the Anti-Whale cap, Native Referral and the preset checks. `main` also contains the Retention Fee opt-in (ONC-15), which is merged on `main` and not deployed | `solana program show`, commit `125061c` |
 | External audit | None | — |
-| Formal review of the next router release | Pending | [Review status](#review-status) |
+| Internal review of router v5 | Done: three preset findings fixed, none open. Not an external audit | [Review status](#review-status) |
 
 ## Is this a honeypot?
 
@@ -32,8 +32,9 @@ What you still have to trust is the upgrade authority. An upgrade could change a
 | `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE` | Not deployed yet |
 | `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE` | Not deployed yet |
 
-- Source: `solana program show <PROGRAM_ID> --url devnet`, read on 2026-10-11. The router was last deployed in slot 509820232 and the hook in slot 506686788. You can run the same command to check the current values.
-- The latest devnet router upgrade (the capped build of commit `dd7cc10`) has the deploy signature `3MujRv1kxL92cPVWXAbXrqeaVF4BbuTdFZJnwvzbjrCGeTuXRQ1tPCxVRnkXiFx3Y3Ayep2N25HX9ztgYNDZeiZ4`.
+- Source: `solana program show <PROGRAM_ID> --url devnet`, read on 2026-10-11. The router was last deployed in slot 509900704 and the hook in slot 506686788. You can run the same command to check the current values.
+- The latest devnet router upgrade is router v5: the capped build of commit `3985d1f`, 439,104 bytes, sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5` (`docs/mainnet-deploy.md`, Pinned build). Its deploy signature is `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r`. The upgrade before it (the capped build of commit `dd7cc10`) has the deploy signature `3MujRv1kxL92cPVWXAbXrqeaVF4BbuTdFZJnwvzbjrCGeTuXRQ1tPCxVRnkXiFx3Y3Ayep2N25HX9ztgYNDZeiZ4`.
+- The hook is unchanged since commit `ec652cc` (`docs/security-review-v5.md`, Scope).
 - The authority is one team-held keypair, not a multisig.
 - The program IDs are fixed in code: the hook accepts only `D4sk6w…` as the router (`ROUTER_ID`), and the router opens markets only for pools whose hook is `CUNNV1…` (`ZPVP_HOOK_ID`).
 
@@ -69,7 +70,7 @@ Commands run from `zpvp/` (Rust), `litesvm-diff/` (LiteSVM, the real DBC program
 | End to end (LiteSVM) | Hook blocks, buys, random buy/exit sequence, graduation, hook revoked, finalize, crank claims, free transfers after graduation | `ROUTER_SO=<unrestricted build> npx tsx src/zpvp_e2e.ts out/scenarios.json 0 <out.json> --ops 60` | 15 PASS, 0 FAIL |
 | xStock quote | TSLAx-quoted market end to end on the capped build, using mainnet mint and token-badge snapshots | `npx tsx src/zpvp_xstocks.ts out/scenario_tiny.json 0` | 13 PASS, 0 FAIL |
 | Launch caps | Allowlist and threshold caps at the cap and one unit above it | `ROUTER_SO=programs/router_capped.so npx tsx src/zpvp_caps.ts out/scenarios.json out/scenario_small.json` | 8 PASS |
-| End to end (devnet) | The same lifecycle checks against live devnet, wSOL quote, on the deployed capped router | `npx tsx src/zpvp_e2e.ts out/scenario_tiny.json 0 out/e2e_devnet_v5.json --rpc <devnet RPC> --wsol --ops 40` (script as of commit `96767fb`; output `litesvm-diff/out/e2e_devnet_v5.json`) | 15 PASS, 0 FAIL |
+| End to end (devnet) | The same lifecycle checks against live devnet, wSOL quote, on the deployed router v5 | `npx tsx src/zpvp_e2e.ts out/scenario_tiny.json 0 out/e2e_devnet_v6.json --rpc <devnet RPC> --wsol --ops 40 --buy-scale 0.005` (commit `125061c`; output `litesvm-diff/out/e2e_devnet_v6.json`) | 15 PASS, 0 FAIL. 14 of the 40 random trades were rejected live with 6022 |
 | DBC port, differential | The Python port of the DBC curve against the real DBC program: amount in, amount out, resulting price and reserve, per swap | `cd sim && python3 replay_diff.py ../litesvm-diff/out/results.json` and the same with `results_b.json` | 9,000 + 12,000 = 21,000 swaps, 0 mismatches |
 | Solvency fuzz | Router buffer at every step: 3 lot modes × (random, greedy adversary) × (stop at graduation, or a dead curve where everyone exits), with the on-chain constants (16 lamports per buy, 2 per exit) | `cd sim && python3 run_fuzz.py --random 300 --adversarial 60 --seed 777 --dust-per-buy 16 --haircut 2` | 2,160 runs in 12 sections, every section "runs with buffer < 0 at any step : 0" |
 | Simulator unit tests | Round trips, early exits never profit, tiny-slice drain attack, random orderings stay solvent | `cd sim && python3 -m unittest test_sim` | 8 tests, OK |
@@ -85,7 +86,7 @@ The fuzz runs on the Python model of the router (`sim/zero_pvp.py`), not on the 
 - **External audit:** none.
 - **Earlier internal review:** findings H1/H2 (configs the refund math is not proven for) and M1 (token account ownership) are fixed. Each has negative tests in `litesvm-diff/src/zpvp_negative.ts`, in the sections labelled "security review H1/H2" and "security review M1".
 - **Per-change reviews:** the AI-assisted security reviews run as part of the build workflow covered `set_auto_exit`, `auto_exit` and the Anti-Whale cap. They found no CRITICAL or HIGH issues. These are not human audits.
-- **Formal review of the next router release** (Auto-Exit, Anti-Whale and the other changes merged since the devnet build): pending at the time of writing. No report has been published.
+- **Internal review of router v5** (`docs/security-review-v5.md`): covers Auto-Exit, the Anti-Whale cap, Native Referral and the preset hardening. It found three preset issues (two HIGH, one LOW) and fixed them before the v5 build was pinned and deployed to devnet. No findings are open. It is not an external audit.
 
 ## Known limitations
 
@@ -97,6 +98,6 @@ The fuzz runs on the Python model of the router (`sim/zero_pvp.py`), not on the 
 6. **Exit at cost is not zero-loss.** An exit gives back the basis minus the trading fee at cost, a 2-lamport haircut and the 16 lamports withheld per buy. Network fees and account rent are separate. A "Zero-Loss Exit" is a roadmap item.
 7. **Auto-Exit uses a standing approval.** To use Auto-Exit, the SDK approves the market PDA as delegate for `u64::MAX` of your base tokens. The full amount stops someone from blocking your exit by sending extra tokens to your account. In the current code, the approval is used only in `auto_exit`, after your deadline and while the curve is live. It stays on your token account until you revoke it.
 8. **No PvP guarantee after graduation.** Exit at cost ends when the curve completes: DBC rejects swaps on a completed curve, and `auto_exit` returns 6021. The token then trades freely once the pool has migrated to DAMM v2, at market prices. Trucee plans to run the migration from its own crank, because Meteora's keepers may auto-migrate only larger pools (unverified, `docs/trucee-plan.md`, "After the freeze").
-9. **Devnet lags `main`.** The devnet router is the capped build of commit `dd7cc10`. Auto-Exit and the Anti-Whale cap are merged and tested in LiteSVM but not deployed yet.
+9. **Devnet runs router v5, not all of `main`.** `main` also contains the Retention Fee opt-in (ONC-15, commit `b3e5d99`: the Market account grows to 300 bytes and error 6024 is added). It is merged on `main` and not deployed.
 
 See [How it works](how-it-works.md) for the mechanism, [Programs reference](developers/programs.md) for instructions and accounts, [Research & data](research-and-data.md) for the simulations, and [Roadmap](roadmap.md) for planned work.

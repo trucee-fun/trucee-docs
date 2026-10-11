@@ -25,7 +25,7 @@ The file is `gitbook/examples/quickstart.ts` in the Trucee source, and this page
 {% hint style="info" %}
 **What works today.** Every SDK call in the example is implemented, and the SDK's public API is pinned by its contract test (`sdk/test/contract.test.ts`).
 
-The SDK also has Auto-Exit builders (`setAutoExitInstructions` and `autoExitInstruction`). Auto-Exit is merged in the router source but not deployed to devnet yet, so this quickstart leaves it out.
+The SDK also has Auto-Exit builders (`setAutoExitInstructions` and `autoExitInstruction`). Auto-Exit runs on devnet since the router v5 upgrade. This quickstart leaves it out to stay short; the [Programs reference](programs.md) documents both instructions.
 {% endhint %}
 
 ## Install
@@ -411,7 +411,7 @@ The router only opens a market for a config that:
 The full tables are `ROUTER_ERRORS` and `HOOK_ERRORS` in `sdk/src/errors.ts`.
 
 {% hint style="info" %}
-`PositionCapExceeded` comes from the Anti-Whale cap, which is merged in the router source but not deployed to devnet yet. It is planned for the next devnet router upgrade (v5).
+`PositionCapExceeded` comes from the Anti-Whale cap, which runs on devnet since the router v5 upgrade. A buy that would leave your position above 20% of the curve's sale supply fails with it.
 {% endhint %}
 
 ## After graduation

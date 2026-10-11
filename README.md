@@ -34,7 +34,7 @@ Trucee changes three things before graduation. Everything else is a normal DBC l
 As far as public sources show, no other launchpad on DBC or elsewhere offers a cost-basis exit before graduation. Transfer hooks themselves are common on DBC. Trucee runs on unmodified DBC transfer-hook pools (the router calls DBC's `swap2_with_transfer_hook`), so the same rules can be adopted by any DBC launchpad.
 
 {% hint style="info" %}
-**Merged, not yet on devnet.** The router source also contains **Auto-Exit** (set a deadline; if the curve has not completed by then, anyone can trigger your exit at cost and the refund goes to your own account) and an **Anti-Whale cap** (a buy may not leave one position above 20% of the curve's base supply, so a curve needs at least five positions to graduate). Both are planned for the next devnet router upgrade (v5).
+**Live on devnet with router v5.** The router also has **Auto-Exit** (set a deadline; if the curve has not completed by then, anyone can trigger your exit at cost and the refund goes to your own account) and an **Anti-Whale cap** (a buy may not leave one position above 20% of the curve's base supply, so a curve needs at least five positions to graduate). Both run on devnet since the router v5 upgrade on 2026-10-11.
 {% endhint %}
 
 ## Proof so far
@@ -42,7 +42,7 @@ As far as public sources show, no other launchpad on DBC or elsewhere offers a c
 * A Python port of the DBC curve matches the on-chain program swap for swap (21,000 swaps).
 * 13,800 randomized fuzz runs never produced a negative buffer.
 * 36 negative tests.
-* The devnet end-to-end run passes 15 of 15 checks, and the full lifecycle (launch, buy, exit at cost, graduation, DAMM v2 migration, surplus claim) has run on devnet.
+* The devnet end-to-end run on router v5 passes 15 of 15 checks, and the full lifecycle (launch, buy, exit at cost, graduation, DAMM v2 migration, surplus claim) has run on devnet.
 
 Commands, limits and known risks are on the [Security](security.md) and [Research & data](research-and-data.md) pages.
 

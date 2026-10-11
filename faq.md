@@ -3,7 +3,7 @@
 Short answers to the questions people ask most. The [Introduction](README.md) has the overview, [How it works](how-it-works.md) walks through the mechanism, and [Security](security.md) covers invariants, tests and known limits.
 
 {% hint style="info" %}
-**Status on 2026-10-11.** Trucee runs on Solana devnet and is not deployed on mainnet yet. Answers marked **v5** describe router features that are merged in the source code but not yet deployed on devnet. The v5 devnet upgrade is still pending.
+**Status on 2026-10-11.** Trucee runs on Solana devnet and is not deployed on mainnet yet. Answers marked **v5** describe router v5 features, which run on devnet since the router v5 upgrade on 2026-10-11.
 {% endhint %}
 
 ## General
@@ -54,8 +54,8 @@ The floor holds however far the price falls, because the router computes the ref
 
 ### Is there a limit on how much I can buy?
 
-{% hint style="warning" %}
-**v5:** merged in the source code, not yet deployed on devnet.
+{% hint style="info" %}
+**v5:** live on devnet since the router v5 upgrade (2026-10-11).
 {% endhint %}
 
 Yes. No buy may leave a position above 20% of the curve's base supply for sale, which is the DBC config's `swap_base_amount`. A buy that would cross the cap fails with error 6022 `PositionCapExceeded`. After a partial exit you can buy back up to the cap. As a result, a curve needs at least five holders to graduate.
@@ -66,8 +66,8 @@ The cap can be enforced because tokens cannot move between wallets before gradua
 
 ### Can I set an exit date and walk away?
 
-{% hint style="warning" %}
-**v5:** merged in the source code, not yet deployed on devnet.
+{% hint style="info" %}
+**v5:** live on devnet since the router v5 upgrade (2026-10-11).
 {% endhint %}
 
 Yes, with Auto-Exit. Turning it on takes two steps:
@@ -87,7 +87,7 @@ A curve graduates when its quote reserve reaches the launch's migration threshol
 
 1. **The hook comes off.** On the swap that completes the curve, DBC revokes the transfer hook. Your tokens stayed in your wallet all along and now become a plain Token-2022 token that you can send and trade anywhere.
 2. **Exits at cost end.** Nobody can sell into a completed curve, so the router stops paying refunds. Your position is now simply the tokens you hold.
-3. **The pool migrates to DAMM v2.** DBC moves the liquidity into a Meteora DAMM v2 pool, where the token trades normally. A crank sends the migration transaction, and Trucee's own crank for this is still in development.
+3. **The pool migrates to DAMM v2.** DBC moves the liquidity into a Meteora DAMM v2 pool, where the token trades normally. A crank sends the migration transaction. Trucee's own crank has a migration job for this, but an unattended run of it on devnet has not been shown yet.
 4. **The surplus is paid out.** Anyone can call `finalize`, which freezes the market's buffer as the surplus and records the total basis still held. Each holder then receives `surplus × their basis ÷ total basis`, rounded down, into their own quote token account. Anyone can trigger that claim for you, and it always pays you. When it closes your position account, the account's rent deposit also goes back to you.
 
 Steps 3 and 4 do not depend on each other. The surplus is whatever exits left in the buffer (sale proceeds minus refunds). Its size therefore depends on trading before graduation, and it can be zero.
@@ -148,11 +148,11 @@ No. Both programs are unaudited. They have had internal reviews, and they come w
 * 13,800 randomized fuzz runs of the refund accounting never produced a negative buffer.
 * 36 negative tests cover account substitution, hook bypass and lifecycle abuse.
 * LiteSVM suites run against the real DBC program and cover Auto-Exit, the per-position cap, the launch caps and xStock quotes.
-* A devnet end-to-end run covered the full lifecycle (launch, buy, exit at cost, graduation, DAMM v2 migration, surplus claim) with the previous router build. A 15/15 smoke run passed on the capped build that is now on devnet.
+* A devnet end-to-end run covered the full lifecycle (launch, buy, exit at cost, graduation, DAMM v2 migration, surplus claim) with an earlier router build (v4). A 15/15 smoke run passed on router v5, the capped build now on devnet, and the Anti-Whale cap rejected 14 of its 40 random trades live.
 
-A formal review of the v5 router is pending. Because the code is unaudited, the default build limits the accepted quote tokens and caps graduation sizes (see [What can I pay with?](#what-can-i-pay-with)).
+An internal security review of router v5 (`docs/security-review-v5.md`) found three preset issues, two of them HIGH. All are fixed in the build on devnet, and none is open. It is not an external audit. Because the code is unaudited, the default build limits the accepted quote tokens and caps graduation sizes (see [What can I pay with?](#what-can-i-pay-with)).
 
-*Source: `sim/test_sim.py`, `sim/replay_diff.py`, `sim/run_fuzz.py`, `litesvm-diff/src/zpvp_negative.ts`, `zpvp_auto_exit.ts`, `zpvp_anti_whale.ts`, `zpvp_caps.ts`, `zpvp_xstocks.ts`, `zpvp_e2e.ts`.*
+*Source: `sim/test_sim.py`, `sim/replay_diff.py`, `sim/run_fuzz.py`, `litesvm-diff/src/zpvp_negative.ts`, `zpvp_auto_exit.ts`, `zpvp_anti_whale.ts`, `zpvp_caps.ts`, `zpvp_xstocks.ts`, `zpvp_e2e.ts`; `litesvm-diff/out/e2e_devnet_v6.json`; `docs/security-review-v5.md`.*
 
 ### Where is Trucee deployed?
 
@@ -161,9 +161,9 @@ A formal review of the v5 router is pending. Because the code is unaudited, the 
 | Hook (`zpvp_hook`) | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` |
 | Router (`zpvp_router`) | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` |
 
-Devnet runs the capped router build without the v5 features. Its upgrade transaction is `3MujRv1kxL92cPVWXAbXrqeaVF4BbuTdFZJnwvzbjrCGeTuXRQ1tPCxVRnkXiFx3Y3Ayep2N25HX9ztgYNDZeiZ4`. Auto-Exit and the per-position cap are merged in the source code and will reach devnet with the v5 upgrade. Neither program is deployed on mainnet yet. For the upgrade authority, see [Is this a honeypot?](#is-this-a-honeypot).
+Devnet runs router v5, the capped build with Auto-Exit, the per-position cap and Native Referral. Its upgrade transaction is `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r`. Neither program is deployed on mainnet yet. For the upgrade authority, see [Is this a honeypot?](#is-this-a-honeypot).
 
-*Source: `programs/zpvp_hook/src/lib.rs` and `programs/zpvp_router/src/lib.rs` (`declare_id!`).*
+*Source: `programs/zpvp_hook/src/lib.rs` and `programs/zpvp_router/src/lib.rs` (`declare_id!`); `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet` (last deployed in slot 509900704).*
 
 ## Wallets
 

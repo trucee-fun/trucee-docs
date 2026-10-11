@@ -1,20 +1,22 @@
 # Roadmap
 
-Everything on this page is **not shipped**. These are features in progress, ideas we have researched, and ideas we cut from the hackathon build. For what Trucee does today, see [How it works](how-it-works.md) and [Security](security.md).
+Everything on this page except the [Shipped](#shipped) section is **not shipped**. These are features in progress, ideas we have researched, and ideas we cut from the hackathon build. For what Trucee does today, see [How it works](how-it-works.md) and [Security](security.md).
 
 {% hint style="info" %}
-Nothing below is live on any network. A roadmap item has no guarantee of shipping, and its design can change.
+Apart from the Shipped section, nothing below is live on any network. A roadmap item has no guarantee of shipping, and its design can change.
 {% endhint %}
 
-## In progress
-
-These two features are in the hackathon scope but not merged yet. If they are not merged by the scope freeze (2026-10-12 12:00 UTC), they stay on this roadmap.
+## Shipped
 
 ### Native Referral
 
-Today the router passes an empty placeholder as the referral account when it calls Meteora DBC's `swap2_with_transfer_hook`. With Native Referral, the router passes a referrer's quote token account instead, so the referrer earns a cut of the trading fee on the trades they refer.
+Shipped in router v5, live on devnet since the router v5 upgrade (2026-10-11). Without a referrer, the router passes an empty placeholder as the referral account when it calls Meteora DBC's `swap2_with_transfer_hook`. With Native Referral, a buy can pass a referrer's quote token account instead, so the referrer earns a cut of the trading fee on the trades they refer.
 
-DBC pays the referral cut out of the **protocol** fee (20% of the protocol share). The buyer's cost and the exit-at-cost refund do not change.
+DBC pays the referral cut out of the **protocol** fee (20% of the protocol share). The buyer's cost and the exit-at-cost refund do not change. Details: [Programs reference](developers/programs.md).
+
+## In progress
+
+This feature is in the hackathon scope but not merged yet. If it is not merged by the scope freeze (2026-10-12 12:00 UTC), it stays on this roadmap.
 
 ### Retention Fee
 
