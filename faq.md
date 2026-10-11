@@ -75,7 +75,7 @@ Yes, with Auto-Exit. Turning it on takes two steps:
 1. Store a deadline as a Unix time in the future. Setting it to 0 clears it.
 2. Approve the market's program address as the delegate of your tokens.
 
-The router uses that approval only in its auto-exit instruction. Once the deadline has passed, and while the curve is still live, anyone can trigger the exit. The router sells your whole position at cost, on the same terms as a manual exit, and pays the refund into your own quote token account. Whoever triggers the exit gains nothing. If the curve graduates first, Auto-Exit no longer applies (error 6021 `AutoExitCurveComplete`), and you keep the token, which is now free to trade, plus your share of the surplus.
+The router uses that approval only in its auto-exit instruction. Once the deadline has passed, and while the curve is still live, anyone can trigger the exit. The router sells your whole position at cost, on the same terms as a manual exit, and pays the refund into your own quote token account. Whoever triggers the exit gains nothing. If the curve graduates first, Auto-Exit no longer applies (error 6021 `AutoExitCurveComplete`), and you keep the token, which is now free to trade, plus your share of the surplus. The approval stays on your token account until you revoke it; the web app offers **Revoke approval** once no deadline is active or the market is finalized (see [For traders → Revoke approval](traders.md#revoke-approval)).
 
 *Source: `programs/zpvp_router/src/lib.rs` (`set_auto_exit`, `auto_exit`, `auto_exit_swap_accounts`, `is_valid_auto_exit_deadline`, `is_auto_exit_due`, errors 6019–6021).*
 
@@ -87,12 +87,12 @@ A curve graduates when its quote reserve reaches the launch's migration threshol
 
 1. **The hook comes off.** On the swap that completes the curve, DBC revokes the transfer hook. Your tokens stayed in your wallet all along and now become a plain Token-2022 token that you can send and trade anywhere.
 2. **Exits at cost end.** Nobody can sell into a completed curve, so the router stops paying refunds. Your position is now simply the tokens you hold.
-3. **The pool migrates to DAMM v2.** DBC moves the liquidity into a Meteora DAMM v2 pool, where the token trades normally. A crank sends the migration transaction. Trucee's own crank has a migration job for this, but an unattended run of it on devnet has not been shown yet.
+3. **The pool migrates to DAMM v2.** DBC moves the liquidity into a Meteora DAMM v2 pool, where the token trades normally. A crank sends the migration transaction. Trucee's own crank has a migration job for this: on devnet it has migrated a graduated pool while running unattended, and it migrated the pool of the final end-to-end run.
 4. **The surplus is paid out.** Anyone can call `finalize`, which freezes the market's buffer as the surplus and records the total basis still held. Each holder then receives `surplus × their basis ÷ total basis`, rounded down, into their own quote token account. Anyone can trigger that claim for you, and it always pays you. When it closes your position account, the account's rent deposit also goes back to you.
 
 Steps 3 and 4 do not depend on each other. The surplus is whatever exits left in the buffer (sale proceeds minus refunds). Its size therefore depends on trading before graduation, and it can be zero.
 
-*Source: `programs/zpvp_hook/src/lib.rs` (header); `programs/zpvp_router/src/lib.rs` (`QUOTE_CAPS`, `finalize`, `claim_surplus`, `ClaimSurplus` closes the position to its owner); `programs/zpvp_router/src/math.rs` (`surplus_share`).*
+*Source: `programs/zpvp_hook/src/lib.rs` (header); `programs/zpvp_router/src/lib.rs` (`QUOTE_CAPS`, `finalize`, `claim_surplus`, `ClaimSurplus` closes the position to its owner); `programs/zpvp_router/src/math.rs` (`surplus_share`); `worker/out/crank-run-devnet.json` and `worker/out/e2e-devnet-final.json` (the crank's migration job on devnet).*
 
 ### What if the curve never graduates?
 
@@ -147,12 +147,12 @@ No. Both programs are unaudited. They have had internal reviews, and they come w
 * A Python port of the DBC curve matches the on-chain program swap for swap over 21,000 swaps.
 * 13,800 randomized fuzz runs of the refund accounting never produced a negative buffer.
 * 36 negative tests cover account substitution, hook bypass and lifecycle abuse.
-* LiteSVM suites run against the real DBC program and cover Auto-Exit, the per-position cap, the launch caps and xStock quotes.
-* A devnet end-to-end run covered the full lifecycle (launch, buy, exit at cost, graduation, DAMM v2 migration, surplus claim) with an earlier router build (v4). A 15/15 smoke run passed on router v5, the capped build now on devnet, and the Anti-Whale cap rejected 14 of its 40 random trades live.
+* LiteSVM suites run against the real DBC program and cover Auto-Exit, the per-position cap, Native Referral, the preset checks, the launch caps and xStock quotes.
+* On devnet, router v5 passed a 15/15 smoke run, in which the Anti-Whale cap rejected 14 of 40 random trades live. The final end-to-end run on router v5 then walked the whole journey (launch, buys, exit at cost, Auto-Exit, graduation, DAMM v2 migration, surplus claims) and passed 13 of 13 checks.
 
-An internal security review of router v5 (`docs/security-review-v5.md`) found three preset issues, two of them HIGH. All are fixed in the build on devnet, and none is open. It is not an external audit. Because the code is unaudited, the default build limits the accepted quote tokens and caps graduation sizes (see [What can I pay with?](#what-can-i-pay-with)).
+An internal security review of router v5 (`docs/security-review-v5.md`) found three preset issues, two of them HIGH. All are fixed in the build on devnet, and none is open. It is not an external audit. Because the code is unaudited, the default build limits the accepted quote tokens and caps graduation sizes (see [What can I pay with?](#what-can-i-pay-with)). The [Security](security.md) page lists every test suite with its command and latest result.
 
-*Source: `sim/test_sim.py`, `sim/replay_diff.py`, `sim/run_fuzz.py`, `litesvm-diff/src/zpvp_negative.ts`, `zpvp_auto_exit.ts`, `zpvp_anti_whale.ts`, `zpvp_caps.ts`, `zpvp_xstocks.ts`, `zpvp_e2e.ts`; `litesvm-diff/out/e2e_devnet_v6.json`; `docs/security-review-v5.md`.*
+*Source: `sim/test_sim.py`, `sim/replay_diff.py`, `sim/run_fuzz.py`, `litesvm-diff/src/zpvp_negative.ts`, `zpvp_auto_exit.ts`, `zpvp_anti_whale.ts`, `zpvp_referral.ts`, `zpvp_preset.ts`, `zpvp_caps.ts`, `zpvp_xstocks.ts`, `zpvp_e2e.ts`; `litesvm-diff/out/e2e_devnet_v6.json`; `worker/out/e2e-devnet-final.json`; `docs/security-review-v5.md`.*
 
 ### Where is Trucee deployed?
 
@@ -161,7 +161,7 @@ An internal security review of router v5 (`docs/security-review-v5.md`) found th
 | Hook (`zpvp_hook`) | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` |
 | Router (`zpvp_router`) | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` |
 
-Devnet runs router v5, the capped build with Auto-Exit, the per-position cap and Native Referral. Its upgrade transaction is `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r`. Neither program is deployed on mainnet yet. For the upgrade authority, see [Is this a honeypot?](#is-this-a-honeypot).
+Devnet runs router v5, the capped build with Auto-Exit, the per-position cap, Native Referral and the preset checks. Its upgrade transaction is `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r`, in slot 509900704. Neither program is deployed on mainnet yet. The mainnet release is router v5 too: source pinned at `3985d1f`, sha256 published (see [Security → Upgrade authority](security.md#upgrade-authority)). For the upgrade authority, see [Is this a honeypot?](#is-this-a-honeypot).
 
 *Source: `programs/zpvp_hook/src/lib.rs` and `programs/zpvp_router/src/lib.rs` (`declare_id!`); `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet` (last deployed in slot 509900704).*
 
@@ -182,7 +182,7 @@ The wallet does not have to handle the hook itself. Every buy and exit already c
 
 **Pending: the hands-on check.** The Trucee team will try a buy and an exit at cost by hand with each of Phantom, Solflare and Backpack on devnet. That check has to run from a hosted HTTPS site, because Phantom does not add its guard instructions on `localhost`. It will also show how each wallet's preview labels a new Token-2022 token, and whether Phantom shows its warning for a domain it has not reviewed yet. This answer will list the results once the check is done.
 
-Buys and exits go through the Trucee router, which the Trucee app and SDK call for you. Both the app and the SDK are still in development. After graduation, the token works like any other Token-2022 token.
+Buys and exits go through the Trucee router, which the Trucee app and SDK call for you. Neither the app nor the SDK is public yet (see [Links](links.md)). After graduation, the token works like any other Token-2022 token.
 
 *Source: `docs/research/RSC-01.md` (Answer, E1, E2, E4, E6, owner check); `litesvm-diff/src/rsc01_injected_ixs.ts`; `programs/zpvp_hook/src/lib.rs` (`transfer_hook` reads `get_instruction_relative(0)`); `sdk/src/instructions.ts` (`routerSwapInstruction`).*
 

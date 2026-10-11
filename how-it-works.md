@@ -10,7 +10,7 @@ Two Solana programs make that work:
 Everything else is DBC doing what it already does: the curve, the fees, graduation, revoking the hook, and the migration to DAMM v2.
 
 {% hint style="info" %}
-**What runs where (2026-10-11).** Steps 1 to 7, 9 (Auto-Exit) and 10 (Anti-Whale cap) describe router v5, which runs on devnet since its upgrade on 2026-10-11. Step 8 is DBC's own migration. The crank's jobs for finalize, claims, auto-exits and migrations are merged; registering them in the running crank is in progress, and an unattended run on devnet has not been shown yet. Details: [Status](#status).
+**What runs where (2026-10-11).** Steps 1 to 7, 9 (Auto-Exit) and 10 (Anti-Whale cap) describe router v5, which runs on devnet since its upgrade on 2026-10-11. Step 8 is DBC's own migration. Trucee's crank runs the jobs for finalize, claims, auto-exits and migrations on its own: on devnet it finalized, migrated and claimed a graduated market unattended. Details: [Status](#status).
 {% endhint %}
 
 ## The lifecycle at a glance
@@ -107,13 +107,13 @@ The curve completes when its quote reserve reaches the config's migration thresh
 
 Holders keep their tokens and get the surplus on top. Rounding leaves less than one base unit per position in the buffer.
 
-**On devnet** (the earlier capped build `dd7cc10`, run of 2026-10-11): the buffer held 43,449,744 lamports at graduation; 5 positions claimed 43,449,742 lamports in total, each exactly `surplus × basis ÷ total basis`, and 2 lamports of rounding stayed in the buffer. The smoke run on router v5 used tiny buys: a surplus of 2,351 lamports, of which 6 claims paid 2,347.
+**On devnet** (the final end-to-end run on router v5, 2026-10-11): the buffer held 15,045,373 lamports at `finalize`. The crank's claims job claimed for all 7 positions and closed them, paying 15,045,370 lamports in total, and 3 lamports of rounding stayed in the buffer.
 
 ## 8. Migration to DAMM v2
 
-After graduation, DBC moves the curve's liquidity into a Meteora DAMM v2 pool with its own migration instruction, which any wallet can send. This is DBC code, not Trucee code. It is independent of `finalize` and the surplus claims, which need only a completed curve. A Zero-PvP pool has been migrated to DAMM v2 on devnet with an earlier router build (v4), using the official DBC SDK, and a demo market on router v5 has been migrated the same way (DAMM v2 pool `GK2DbdQfohVv4rrKyjXn7oqbdaYYfaotBNkKMyDcRtsM`).
+After graduation, DBC moves the curve's liquidity into a Meteora DAMM v2 pool with its own migration instruction, which any wallet can send. This is DBC code, not Trucee code. It is independent of `finalize` and the surplus claims, which need only a completed curve. On router v5, the crank's migration job migrated the pool of the final devnet end-to-end run (DAMM v2 pool `6W3BGqQDWBJqfrEARB3jfbpWmZaAEjMESyCScnmo8TBP`). The first Zero-PvP pool migrated on devnet, with an earlier router build (v4), was migrated with the official DBC SDK.
 
-Trucee's crank has its own migration job, because it is not verified that Meteora's keepers migrate pools below 10 SOL. The job is merged; registering it in the running crank is in progress, and an unattended run on devnet has not been shown yet.
+Trucee's crank has its own migration job, because Meteora's mainnet keepers migrate SOL pools only when the graduation threshold is 10 SOL or more. The crank runs the job on its own: on devnet, running unattended, it migrated a graduated market's pool and also sent that market's `finalize` and claims.
 
 ## 9. Auto-Exit (v5)
 
@@ -133,7 +133,7 @@ The hook lets the delegated sale through because the top-level instruction is st
 cap = floor(swap_base_amount × 2,000 ÷ 10,000)
 ```
 
-`swap_base_amount` is the base supply the DBC config sells before graduation. A buy over the cap fails with `PositionCapExceeded` (6022). On the devnet test config, which sells 185,067,869,081,122 raw units, the cap is 37,013,573,816,224. In the router v5 smoke run on devnet, the cap rejected 14 of 40 random trades live.
+`swap_base_amount` is the base supply the DBC config sells before graduation. A buy over the cap fails with `PositionCapExceeded` (6022). On the devnet test config, which sells 185,067,869,081,122 raw units, the cap is 37,013,573,816,224. In the router v5 smoke run on devnet, the cap rejected 14 of 40 random trades live, and in the final end-to-end run a buy above the cap failed with 6022.
 
 * The cap is a program constant, the same for every market.
 * It also applies to the buy that completes the curve, so a curve needs at least 5 positions to graduate.
@@ -142,9 +142,9 @@ cap = floor(swap_base_amount × 2,000 ÷ 10,000)
 
 ## Status
 
-As of 2026-10-11. "Devnet" is the router upgraded on 2026-10-11 to v5, the capped build of commit `3985d1f`. `main` also contains the Retention Fee opt-in (ONC-15), which is merged on `main` and not deployed. Settling the retention fees is not merged; Retention Fee is on the [Roadmap](roadmap.md).
+As of 2026-10-11. "Devnet" is the router upgraded on 2026-10-11 to v5 (slot 509900704), the capped build of commit `3985d1f`. The router source on `main` is that same build: its `zpvp/` tree equals the one at `3985d1f`.
 
-| Piece | Router source on `main` | Devnet |
+| Piece | Source on `main` | Devnet |
 | --- | --- | --- |
 | Transfer hook `zpvp_hook` | Merged | Live |
 | Cost basis, exit at cost, buffer vault | Merged | Live |
@@ -154,10 +154,10 @@ As of 2026-10-11. "Devnet" is the router upgraded on 2026-10-11 to v5, the cappe
 | Anti-Whale cap (20% of curve supply) | Merged (v5) | Live |
 | Native Referral (optional referrer on `buy`) | Merged (v5) | Live |
 | Zero-PvP preset check in `init_market` (error 6023) | Merged (v5) | Live |
-| DAMM v2 migration | DBC instruction | Ran with router v4 and v5 |
-| Crank jobs for finalize, claims, auto-exits and migration | Jobs merged; registration in progress | Unattended run not shown yet |
+| DAMM v2 migration | DBC instruction | Ran with router v4, and with v5 in the final end-to-end run |
+| Crank jobs for finalize, claims, auto-exits and migration | Merged and registered in the crank | Ran unattended on devnet |
 
-Features that are not merged yet are listed on the [Roadmap](roadmap.md), not here.
+Features that are not built are listed on the [Roadmap](roadmap.md), not here.
 
 Devnet program IDs:
 
@@ -176,7 +176,7 @@ Paths are relative to the root of the Trucee monorepo. Every number on this page
 | Basis = quote reserve growth − 16; the buy fee is taken from the input | `zpvp/programs/zpvp_router/src/lib.rs` (`buy`), `zpvp/programs/zpvp_router/src/math.rs` (`DUST_PER_BUY`, `basis_for_buy`), `sim/zero_pvp.py` and `sim/dbc_curve.py` (module docstrings) |
 | At most 14 lamports of DBC rounding per round trip | `zpvp/programs/zpvp_router/src/math.rs` (comment on `DUST_PER_BUY`) |
 | Refund formula, haircut 2, denominator 1,000,000,000, average-cost exits | `zpvp/programs/zpvp_router/src/math.rs` (`refund_for`, `HAIRCUT_PER_EXIT`, `FEE_DENOMINATOR`, `basis_for_exit`) |
-| 1 SOL basis at a 1% fee refunds 989,999,998 lamports | `math.rs` test `refund_matches_python_reference`; `cargo test -p zpvp_router --lib` run in `zpvp/` (17 passed, 0 failed on 2026-10-11) |
+| 1 SOL basis at a 1% fee refunds 989,999,998 lamports | `math.rs` test `refund_matches_python_reference`; `cd zpvp && cargo test -p zpvp_router` (48 passed, 0 failed on `ba6dcb1`, 2026-10-11) |
 | Proceeds go to the buffer, the refund comes from it, `BufferInsufficient` | `zpvp/programs/zpvp_router/src/lib.rs` (`sell`, `exit_at_cost`) |
 | 21,000 swaps bit-exact; 13,800 fuzz runs with no negative buffer | `docs/trucee-plan.md` (Core mechanism, "Verified"); `sim/run_fuzz.py`, `sim/zero_pvp.py` |
 | `init_market` checks; quote caps of 10 SOL, 5 TSLAx and 10 NVDAx | `zpvp/programs/zpvp_router/src/lib.rs` (`init_market`, `QUOTE_CAPS`, `check_launch_caps`), `zpvp/programs/zpvp_router/src/dbc.rs` (`read_config`) |
@@ -184,14 +184,12 @@ Paths are relative to the root of the Trucee monorepo. Every number on this page
 | DBC revokes the hook on the completing swap | `docs/trucee-plan.md` (Core mechanism: DBC `process_swap.rs` lines 364–425); `zpvp/programs/zpvp_hook/src/lib.rs` (module doc) |
 | Partial-fill buys | `zpvp/programs/zpvp_router/src/lib.rs` (`buy`, `SWAP_MODE_PARTIAL_FILL`), `sim/dbc_curve.py` (`buy`) |
 | Surplus snapshot and pro-rata claim, rent back to the owner, `SurplusOverclaimed` | `zpvp/programs/zpvp_router/src/lib.rs` (`finalize`, `claim_surplus`), `math.rs` (`surplus_share`) |
-| Devnet surplus of 43,449,744 lamports; 5 claims totalling 43,449,742 | `litesvm-diff/out/e2e_devnet_v5.json`; devnet finalize transaction `64nuqm2hcGd4GLcBtt61kdaLjFDwNED7X5DNKqyK3SnbaN1KPqpmceuBsTjhGSgWaokLAQ8Hxu5VZBSRgGnxUxrb` |
+| Final devnet end-to-end run on router v5: 13 passed, 0 failed; surplus 15,045,373 lamports, 7 claims totalling 15,045,370; a buy above the cap rejected with 6022; DAMM v2 pool `6W3BGqQDWBJqfrEARB3jfbpWmZaAEjMESyCScnmo8TBP` | `worker/scripts/e2e-devnet.ts`; `worker/out/e2e-devnet-final.json` (commit `99c8a42`, steps 6, 9, 10 and 11); devnet migration transaction `2Pos6pHCTzpviqC2HHQ8THR27WGzMMqZGtdKFpN5KqaBDvioF6YE8d8mQyxCPVqdLsb6cmrJeuScxSn6RQXU6mJA` and first claim `4bDKeg824SZtBW27Fq1hba936nbRw5XXE2QwJDbfCzG9w54fJuAkNowWFxH9R8bAtqX18rTNDFF33TdJ6TekGAMF` |
 | Devnet router is v5: the capped build of `3985d1f`, 439,104 bytes, sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5`, last deployed in slot 509900704 | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet`; devnet deploy transaction `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r`; `docs/mainnet-deploy.md` (Pinned build) |
-| Router v5 smoke run on devnet: 15 passed, 0 failed; 14 of 40 random trades rejected with 6022; surplus 2,351 lamports, 6 claims totalling 2,347 | `litesvm-diff/out/e2e_devnet_v6.json` (commit `125061c`); devnet finalize transaction `3TWpzqcZNmvDPKJAY8BBA7YZY99RdrbC4xkgHqTbWquJBT8j31Fh7hGzauuymNhMZ9eSqcghPFhLgvKe3kLCeh4` |
-| Earlier devnet router: the capped build of `dd7cc10`; smoke run 15 passed, 0 failed | devnet deploy transaction `3MujRv1kxL92cPVWXAbXrqeaVF4BbuTdFZJnwvzbjrCGeTuXRQ1tPCxVRnkXiFx3Y3Ayep2N25HX9ztgYNDZeiZ4`; commit `96767fb` |
-| Retention Fee opt-in on `main`, not deployed | commit `b3e5d99` (ONC-15) |
+| Router v5 smoke run on devnet: 15 passed, 0 failed; 14 of 40 random trades rejected with 6022 | `litesvm-diff/out/e2e_devnet_v6.json` (commit `125061c`) |
 | Auto-Exit rules; error codes 6007, 6010, 6019, 6020 and 6021 | `zpvp/programs/zpvp_router/src/lib.rs` (`set_auto_exit`, `auto_exit`, `RouterError` and its unit tests); `litesvm-diff/src/zpvp_auto_exit.ts` |
 | Anti-Whale: 2,000 bps of `swap_base_amount`, error 6022, devnet cap 37,013,573,816,224, at least 5 positions | `zpvp/programs/zpvp_router/src/lib.rs` (`ANTI_WHALE_BPS`, `anti_whale_cap` and its unit test); `litesvm-diff/src/zpvp_anti_whale.ts`; `docs/trucee-plan.md` (section 3) |
-| DAMM v2 migration on devnet with router v4 | `docs/trucee-plan.md` (Core mechanism, "Verified"); `litesvm-diff/src/migrate_devnet.ts` |
-| DAMM v2 migration of a demo market on router v5 | `worker/out/seed-devnet.json` (commit `b5c66e5`, market `graduated`); devnet migration transaction `4up745EVJXcz1DZmMmt6eXFXhNdWgvAkRUH4by1Hnu1ArQuxwcUXaJvNVZf9x176uw5TH389ut7qomTnHd9v2hz7` |
+| DAMM v2 migration on devnet with router v4 (history) | `docs/trucee-plan.md` (Core mechanism, "Verified"); `litesvm-diff/src/migrate_devnet.ts` |
 | xStock issuers can pause or claw back balances | `docs/trucee-plan.md` (section 1); `zpvp/programs/zpvp_router/src/lib.rs` (comment on `QUOTE_CAPS`) |
-| The crank (finalize, claims, auto-exit, migration) and why it must migrate (keepers at 10 SOL unverified) | `worker/src/crank/jobs/` (`finalize.ts`, `claims.ts`, `auto-exit.ts`, `migrate.ts`); `docs/trucee-plan.md` (After the freeze) |
+| The crank (finalize, claims, auto-exit, migration) runs every job unattended; on devnet one unattended run finalized, migrated and claimed all 6 positions of market `5t7tfUeP2msicPhFihz5vcasYqwk4tKTpgQRui96oyar` | `worker/src/index.ts` (`buildJobs`); `worker/src/crank/jobs/` (`finalize.ts`, `claims.ts`, `auto-exit.ts`, `migrate.ts`); `worker/out/crank-run-devnet.json` (commit `48319aa`) |
+| Meteora's mainnet keepers migrate SOL pools only from a 10 SOL threshold | `docs/research/RSC-03.md` (Answer, E1) |

@@ -16,7 +16,7 @@ This page walks through one TypeScript file that uses `@trucee/sdk` on Solana de
 
 It reads accounts and builds and signs transactions in memory. It never sends a transaction and reads no secret key: the signer is a keypair it generates on the spot.
 
-The file is `gitbook/examples/quickstart.ts` in the Trucee source, and this page embeds it verbatim. It typechecks against the SDK's public API with `cd gitbook/examples && npm ci && npx tsc --noEmit`.
+The file is `gitbook/examples/quickstart.ts` in the Trucee source, and this page embeds it verbatim. It typechecks against the SDK's public API with `cd sdk && npm ci && cd ../gitbook/examples && npm ci && npx tsc --noEmit`.
 
 {% hint style="warning" %}
 **Status:** the Trucee programs run on Solana devnet only. They are unaudited and not deployed to mainnet. `@trucee/sdk` is not published to the npm registry and the source repository is not public yet (see [Links](../links.md)), so for now you install the SDK from a checkout of the source.
@@ -32,11 +32,10 @@ The SDK also has Auto-Exit builders (`setAutoExitInstructions` and `autoExitInst
 
 You need a checkout of the Trucee source and Node.js 22.18 or later: the example runs the `.ts` file directly with Node's built-in type stripping, so it needs no TypeScript runner.
 
-From the root of the checkout, build the SDK first. Your project imports its compiled `dist/` folder.
+From the root of the checkout, install the SDK's own dependencies first. `npm ci` in `sdk/` also builds the SDK's `dist/` folder (its `prepare` script), which is what your project imports.
 
 ```bash
-npm --prefix sdk ci
-npm --prefix sdk run build
+cd sdk && npm ci && cd ..
 ```
 
 Then install, typecheck and run the example:
@@ -48,6 +47,8 @@ npx tsc --noEmit                         # or: npm run typecheck
 npm run quickstart                       # reads devnet, sends nothing
 npm run quickstart -- <wallet address>   # also shows that wallet's floor and builds its exit
 ```
+
+The example's `.npmrc` sets `install-links=true`, so `npm ci` installs the SDK as a packed copy, not as a symlink: npm packs the `sdk/` folder (running its `prepare` build) and copies the result into `node_modules/@trucee/sdk`. The SDK's own imports, such as `@solana/web3.js`, then resolve from the example's `node_modules`, so the script loads one copy of each. After you change the SDK, run `npm ci` in `gitbook/examples` again: a plain `npm install` reports "up to date" and keeps the old copy.
 
 ### In your own project
 
@@ -68,9 +69,9 @@ Depend on the SDK folder and install its peer dependencies yourself, on the rang
 ```
 
 * The SDK is an ES module (`"type": "module"` with import-only `exports`), so import it from ES module code or through a bundler.
-* npm installs a `file:` dependency as a symlink. Node and TypeScript then resolve the SDK's own imports (`@solana/web3.js` and its other peers) from the SDK folder's `node_modules`, which exists once you have built the SDK, so your script can load two copies of `@solana/web3.js`. TypeScript treats two copies of the same version as one package, and the SDK's builders accept public keys from either copy, so the example works this way. An `instanceof` check between an SDK object and your own import fails, though.
-* For a single copy, install the SDK as a packed copy instead of a symlink with `npm install --install-links`, and re-run it after every SDK rebuild.
-* The example's `tsconfig.json` sets `preserveSymlinks` and its `quickstart` script runs Node with `--preserve-symlinks`: if the SDK folder has no `node_modules`, the SDK's imports then resolve from the example's own.
+* Install the SDK as a packed copy, as the example does: put `install-links=true` in your project's `.npmrc` (npm 9 or later), and run `npm ci` in `sdk/` before your own `npm ci`. Re-run your `npm ci` after every SDK change.
+* Without `install-links`, npm installs a `file:` dependency as a symlink. Node and TypeScript then resolve the SDK's own imports (`@solana/web3.js` and its other peers) from the SDK folder's `node_modules`, so your script can load two copies of `@solana/web3.js`. The SDK's builders accept public keys from either copy, but an `instanceof` check between an SDK object and your own import fails.
+* The example's `tsconfig.json` sets `preserveSymlinks` and its `quickstart` script runs Node with `--preserve-symlinks`. They only matter for a symlinked SDK and do nothing with the packed copy.
 * Every token and quote amount in the SDK is a `bigint` in raw base units (lamports for SOL).
 
 ## The example
@@ -318,7 +319,7 @@ try {
 
 ### 1. Read markets
 
-`fetchAllMarkets(connection, routerProgramId)` returns every router `Market` account (one per DBC pool) from a single `getProgramAccounts` call. A `MarketAccount` holds the pool, config, base and quote mints, the pool's vaults, the market's `bufferVault`, the DBC fee as `feeNumerator` (parts per 1,000,000,000), the open cost basis `totalBasis` and the graduation snapshot fields. To load one market by address, use `fetchMarket(connection, address)`; it resolves `null` when the account does not exist.
+`fetchAllMarkets(connection, routerProgramId)` returns every router `Market` account (one per DBC pool), with one `getProgramAccounts` scan per supported Market size. It skips the older, shorter Market accounts the devnet router still owns from before the v5 upgrade. A `MarketAccount` holds the pool, config, base and quote mints, the pool's vaults, the market's `bufferVault`, the DBC fee as `feeNumerator` (parts per 1,000,000,000), the open cost basis `totalBasis` and the graduation snapshot fields. To load one market by address, use `fetchMarket(connection, address)`; it resolves `null` when the account does not exist.
 
 `finalized` tells you that a market has graduated: the router's `finalize` only succeeds once the curve is complete (otherwise it fails with error 6009 `CurveNotComplete`). The example buys into the first market that is not finalized.
 
@@ -388,7 +389,12 @@ The router only opens a market for a config that:
 
 * uses the Trucee transfer hook (error 6013 `WrongTransferHook`);
 * charges a static fee collected in the quote token, with no fee scheduler, rate limiter or dynamic fee (error 6014 `UnsupportedFeeConfig`);
+* follows the Zero-PvP preset: no creator allocation, dynamic supply, all LP permanently locked with no LP vesting, DAMM v2 migration with no migration fee, and an immutable token authority, so nobody keeps the mint authority (error 6023 `PresetNotAllowed`);
 * uses an allowlisted quote mint (error 6017 `QuoteMintNotAllowed`) with a threshold at or below its cap (error 6018 `ThresholdTooHigh`).
+
+`buildLaunchPlan` builds configs that pass all of these, and it throws before building one that would not.
+
+**If someone opens your market first.** `init_market` is permissionless, so a third party can open the market between your pool and market transactions; your market transaction then fails with "account already in use". The market they opened is the one you would have opened. Call `buildLaunchPlan` again with the same parameters plus `configKeypair: plan.signers[0][0]` and `baseMintKeypair: plan.signers[1][0]` from the first plan: the new plan skips every account that already exists and contains only what is left, for example your initial buy. Give that buy a fresh `initialBuyMinOut`, because the price may have moved.
 
 ### Sign
 

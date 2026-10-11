@@ -9,7 +9,7 @@ description: >-
 On a Trucee token, the trade panel offers two actions before graduation: **Buy** and **Exit at cost**. Every buy records your cost basis. An exit pays that basis back, minus the fee at cost and a 2-lamport haircut, wherever the price is. The amount you would get back right now is shown as **Your floor**. When the curve graduates, exits at cost end, the token becomes freely transferable, and holders split the market's surplus by basis. [How it works](how-it-works.md) explains the mechanism. This page follows the screens of the Trucee web app.
 
 {% hint style="warning" %}
-**Status on 2026-10-11.** Trucee runs on Solana devnet only, with router v5. SOL is the only quote token on devnet. The programs are unaudited, and the web app is not public yet (see [Links](links.md)). Trucee's crank has jobs for Auto-Exit, `finalize` and surplus claims. The jobs are merged, and they ran against a devnet market in the end-to-end run below. Registering them in the running crank is in progress (CRK-07), so an unattended run has not been shown yet.
+**Status on 2026-10-11.** Trucee runs on Solana devnet only, with router v5. SOL is the only quote token on devnet. The programs are unaudited, and the web app is not public yet (see [Links](links.md)). Trucee's crank runs its Auto-Exit, `finalize`, surplus-claim and migration jobs on its own: the final end-to-end run below used every one of them, and on devnet the crank also ran unattended against a graduated market.
 {% endhint %}
 
 ## Where things are
@@ -51,6 +51,14 @@ Your first buy in a market also opens your position account, and your wallet pay
 ### The 20% cap
 
 No buy may leave your position above 20% of the curve's sale supply. A buy over the cap fails with error 6022 `PositionCapExceeded`, and the app shows "This buy would put you above 20% of the curve supply". After an exit, you can buy again up to the cap. Because one position can hold at most 20%, a curve needs at least five positions to graduate.
+
+### Referral links
+
+Once your wallet is connected, the token page shows **Your referral link**, a link to that token page with `?ref=` and your wallet address, and a **Copy link** button. When someone opens a token page through such a link, their buys in that browser tab name you as the referrer, also on other token pages they open in the same tab. DBC then pays you a share of its protocol fee: 20% of the protocol's 20% of the trading fee. The buyer pays the same, and their basis and floor do not change.
+
+* The app passes a referrer only when the referrer's wallet already has a token account for the market's quote token (wSOL on devnet), so a buyer never pays rent for someone else's account. Without that account, the buy goes through without a referrer.
+* A referral to your own wallet is ignored.
+* A `ref` value that is not a wallet address is ignored.
 
 ## Your floor
 
@@ -105,10 +113,11 @@ The **Auto-Exit** box appears at the bottom of the trade panel while the curve i
 * **Presets:** 1 h, 24 h or 3 d from now, under "Exit at cost after".
 * **Custom deadline (UTC):** pick a date and time, then press **Set deadline**. The field is read as UTC, not your local time. The deadline must be at least a minute from now ("Pick a time at least a minute from now.") and at most a year from now ("Pick a time within a year from now.").
 
-Setting a deadline sends one transaction with two instructions:
+Setting a deadline sends one transaction with three instructions:
 
-1. It approves the market's program address (PDA) as the delegate of your token account for that token, for an unlimited amount (`u64::MAX`).
-2. It calls the router's `set_auto_exit` with your deadline.
+1. It creates your wallet's token account for the quote token if it does not exist, and your wallet pays its rent. The refund of an Auto-Exit lands in that account, so it has to exist when the deadline passes.
+2. It approves the market's program address (PDA) as the delegate of your token account for that token, for an unlimited amount (`u64::MAX`).
+3. It calls the router's `set_auto_exit` with your deadline.
 
 The box discloses the approval before you sign:
 
@@ -130,6 +139,14 @@ The box shows **Exits at cost from** and the deadline in UTC. The Portfolio's **
 
 Press **Cancel auto-exit**. This sends `set_auto_exit(0)`, which clears the deadline, and then revokes the delegate on your token account. The box confirms: "Cancelling clears the deadline and revokes the delegate on that token account."
 
+### Revoke approval
+
+The market's approval can outlive your deadline: a full exit or an Auto-Exit clears the deadline but leaves the approval on your token account, and after `finalize` the router refuses to clear a deadline (error 6010), so **Cancel auto-exit** no longer works there. For those cases the box offers **Revoke approval**. It appears when your token account for the token has a delegate and no deadline is active, or once the market is finalized. It sends one Token-2022 revoke and no router instruction. The box explains:
+
+> Remove the token approval this market still holds: an unlimited (u64::MAX) delegate on your token account. Without an active Auto-Exit it cannot move your tokens, but wallets still list it as open.
+
+If the delegate on that token account is another account, not this market, the button revokes that approval instead, and the box says so.
+
 ### When the deadline passes
 
 Once the on-chain clock reaches your deadline, anyone can send `auto_exit` for your position. It sells your whole position at cost, on the same terms as **Exit at cost**, and clears the deadline. Two differences from a manual exit:
@@ -137,10 +154,10 @@ Once the on-chain clock reaches your deadline, anyone can send `auto_exit` for y
 * **The refund stays wrapped.** On a SOL market it lands as wSOL in your wallet's wSOL account. Your next exit in the app unwraps it (see [SOL markets](#exit-at-cost)).
 * **It exits everything.** `auto_exit` always exits the whole position.
 
-If the curve graduates before your deadline, nothing is exited (error 6021 `AutoExitCurveComplete`). You keep your tokens, which are now freely transferable, and your share of the surplus. The app hides the Auto-Exit box once the curve has graduated, and after `finalize` the router refuses to set or clear a deadline (error 6010). The approval stays on your token account until you revoke it yourself. The router uses it only in `auto_exit`, which fails once the curve is complete.
+If the curve graduates before your deadline, nothing is exited (error 6021 `AutoExitCurveComplete`). You keep your tokens, which are now freely transferable, and your share of the surplus. Once the curve has graduated, the app no longer offers a deadline, and after `finalize` the router refuses to set or clear one (error 6010). The approval stays on your token account until you revoke it, for example with [Revoke approval](#revoke-approval). The router uses it only in `auto_exit`, which fails once the curve is complete.
 
 {% hint style="info" %}
-**The crank needs your quote token account.** `auto_exit` pays the refund into your wallet's quote token account, which must exist. On a SOL market, an exit in the app closes that account, and your next buy creates it again. If the account is missing when your deadline passes, the crank creates it only when the refund is at least 0.25 SOL (its default `MIN_ATA_VALUE_LAMPORTS`) and otherwise skips your position. A skipped position keeps its deadline, and you can still exit it yourself at cost.
+**The crank needs your quote token account.** `auto_exit` pays the refund into your wallet's quote token account, which must exist. Setting a deadline in the app creates it if it is missing. On a SOL market, a later exit in the app closes it again, and your next buy or deadline creates it again. If the account is missing when your deadline passes, the crank creates it only when the refund is at least 0.25 SOL (its default `MIN_ATA_VALUE_LAMPORTS`) and otherwise skips your position. A skipped position keeps its deadline, and you can still exit it yourself at cost.
 {% endhint %}
 
 ## Graduation
@@ -201,6 +218,9 @@ Above the table, one total per quote token adds up the floors of your live posit
 | This buy would put you above 20% of the curve supply | The 20% cap (router 6022 `PositionCapExceeded`) |
 | Enter an amount above zero and no more than your position | Exit amount out of range (router 6007 `InvalidExitAmount`) |
 | The refund buffer can't cover this exit right now, try a smaller amount | Router 6015 `BufferInsufficient` |
+| Pick a deadline in the future | The Auto-Exit deadline is not after the on-chain clock (router 6019 `AutoExitDeadlineInPast`) |
+| This market has finalized; Auto-Exit is no longer available | Setting or clearing a deadline after `finalize` (router 6010 `AlreadyFinalized`) |
+| The market has not finalized yet — try again after graduation | A claim before `finalize` (router 6011 `NotFinalized`) |
 | Transfers are locked until graduation | A transfer outside the router before graduation (hook `TransferNotViaRouter`) |
 | The price moved, try again | A wallet's own guard instruction (Lighthouse) failed because the price moved between preview and execution |
 | Not enough balance | Your wallet cannot cover the amount, the network fee or the rent |
@@ -212,7 +232,7 @@ Above the table, one total per quote token adds up the floors of your live posit
 
 ## Proof on devnet
 
-The QA-02 end-to-end run walked one fresh SOL market (graduation threshold 0.3 SOL, 1% fee) through the whole trader journey on router v5 on devnet, on 2026-10-11 from 13:27 to 13:31 UTC. It used the same SDK functions as the app and ran the crank's real jobs one tick at a time against that market. It finished with **13 passed, 0 failed**.
+The final end-to-end run (QA-05) walked one fresh SOL market (graduation threshold 0.3 SOL, 1% fee) through the whole trader journey on router v5 on devnet, after the last devnet router upgrade, on 2026-10-11 from 14:16 to 14:20 UTC. It used the same SDK functions as the app and ran the crank's real jobs one tick at a time against that market. It finished with **13 passed, 0 failed**. An earlier run of the same script (QA-02, 13:27 to 13:31 UTC) also passed 13 of 13 checks, with the same amounts.
 
 | Step | Check |
 | --- | --- |
@@ -234,13 +254,16 @@ The run on Solana Explorer (devnet):
 
 | Item | Address or signature |
 | --- | --- |
-| Market | [`DdDWi1hFKSk5D2ErQk9VPUbzRDHwbr2ms7ctUdJPT7tV`](https://explorer.solana.com/address/DdDWi1hFKSk5D2ErQk9VPUbzRDHwbr2ms7ctUdJPT7tV?cluster=devnet) |
-| DAMM v2 pool after migration | [`2guf3Tfy5tEv5EDykpY6yyS2cW9TATVSZsfn13Y7Yuni`](https://explorer.solana.com/address/2guf3Tfy5tEv5EDykpY6yyS2cW9TATVSZsfn13Y7Yuni?cluster=devnet) |
-| Launch: the transaction that opens the market (step 1) | [`2BK2k34UxVxiZEQsyCrQkjmgwk1k9UntKq4cD2QnDga7BvZt3MVFjfWEmL1ooo93XqsaTYtsiCYdeocDwNbsqiPd`](https://explorer.solana.com/tx/2BK2k34UxVxiZEQsyCrQkjmgwk1k9UntKq4cD2QnDga7BvZt3MVFjfWEmL1ooo93XqsaTYtsiCYdeocDwNbsqiPd?cluster=devnet) |
-| Auto-Exit sent by the crank's job (step 7) | [`5VGEs3wYHhF5MC6WMYHHotMH6nGLJiCf9vzvyEEq1VphkK12PKSsMphebjgfgY3vG5DkELALePsuxvWrm5WrmSo3`](https://explorer.solana.com/tx/5VGEs3wYHhF5MC6WMYHHotMH6nGLJiCf9vzvyEEq1VphkK12PKSsMphebjgfgY3vG5DkELALePsuxvWrm5WrmSo3?cluster=devnet) |
-| A surplus claim sent by the crank's job (step 11) | [`4jQmiR5ZTLWrWAAcvXpyb2sMebYFLRnyBaSVGSKbKqr8A4ArA2FnwZMhn6WeY7qzGbXqQsGb84CxdTtNygoZxgGL`](https://explorer.solana.com/tx/4jQmiR5ZTLWrWAAcvXpyb2sMebYFLRnyBaSVGSKbKqr8A4ArA2FnwZMhn6WeY7qzGbXqQsGb84CxdTtNygoZxgGL?cluster=devnet) |
+| Market | [`Fk4yvubMy7dZ8h6UVnPLD3naVPc51Zs9RnHEX3ph6HAu`](https://explorer.solana.com/address/Fk4yvubMy7dZ8h6UVnPLD3naVPc51Zs9RnHEX3ph6HAu?cluster=devnet) |
+| DAMM v2 pool after migration | [`6W3BGqQDWBJqfrEARB3jfbpWmZaAEjMESyCScnmo8TBP`](https://explorer.solana.com/address/6W3BGqQDWBJqfrEARB3jfbpWmZaAEjMESyCScnmo8TBP?cluster=devnet) |
+| Launch: the transaction that opens the market (step 1) | [`2kCfgoyT1eyeWh7xAJPA1VWB1zsPuoRut41YVea8T1eEMSotzD3TNQjmcERPBRzdNAjbFrWAL1ApBt6RoKJTt1iA`](https://explorer.solana.com/tx/2kCfgoyT1eyeWh7xAJPA1VWB1zsPuoRut41YVea8T1eEMSotzD3TNQjmcERPBRzdNAjbFrWAL1ApBt6RoKJTt1iA?cluster=devnet) |
+| Auto-Exit sent by the crank's job (step 7) | [`4rXRCf3WbSGwkv25vUNq8xVoi4uBnXcvA8N7pWYrFFEUAN6d73XP4Ng1ZPDN3gJwCifvuqDpz2HcgB8crXwKSGcx`](https://explorer.solana.com/tx/4rXRCf3WbSGwkv25vUNq8xVoi4uBnXcvA8N7pWYrFFEUAN6d73XP4Ng1ZPDN3gJwCifvuqDpz2HcgB8crXwKSGcx?cluster=devnet) |
+| DAMM v2 migration sent by the crank's job (step 10) | [`2Pos6pHCTzpviqC2HHQ8THR27WGzMMqZGtdKFpN5KqaBDvioF6YE8d8mQyxCPVqdLsb6cmrJeuScxSn6RQXU6mJA`](https://explorer.solana.com/tx/2Pos6pHCTzpviqC2HHQ8THR27WGzMMqZGtdKFpN5KqaBDvioF6YE8d8mQyxCPVqdLsb6cmrJeuScxSn6RQXU6mJA?cluster=devnet) |
+| A surplus claim sent by the crank's job (step 11) | [`4bDKeg824SZtBW27Fq1hba936nbRw5XXE2QwJDbfCzG9w54fJuAkNowWFxH9R8bAtqX18rTNDFF33TdJ6TekGAMF`](https://explorer.solana.com/tx/4bDKeg824SZtBW27Fq1hba936nbRw5XXE2QwJDbfCzG9w54fJuAkNowWFxH9R8bAtqX18rTNDFF33TdJ6TekGAMF?cluster=devnet) |
 
-`worker/out/e2e-devnet.json` lists every account and signature of the run, step by step.
+`worker/out/e2e-devnet-final.json` lists every account and signature of the run, step by step (`worker/out/e2e-devnet.json` for the earlier QA-02 run).
+
+**The crank on its own.** In a separate run on devnet, the crank ran unattended for 180 seconds with every job registered. It finalized the graduated market [`5t7tfUeP2msicPhFihz5vcasYqwk4tKTpgQRui96oyar`](https://explorer.solana.com/address/5t7tfUeP2msicPhFihz5vcasYqwk4tKTpgQRui96oyar?cluster=devnet), migrated its pool to DAMM v2 and claimed the surplus for all 6 of its positions, with no job errors (`worker/out/crank-run-devnet.json`).
 
 ## Sources
 
@@ -250,18 +273,21 @@ Paths are relative to the root of the Trucee monorepo.
 | --- | --- |
 | Trade panel: tabs, labels, slippage presets 0.5%, 1% and 3%, the 20% note, the SOL unwrap line, the graduated notice | `app/src/components/trade/trade-panel.tsx` (`SLIPPAGE_PRESETS_BPS`, `ANTI_WHALE_CAP_NOTE`, `SOL_UNWRAP_NOTE`, `GraduatedNotice`) |
 | Default slippage 1%, quotes expire after 30 s, position re-read every 10 s and right before an exit, "Before graduation" line | `app/src/components/trade/trade-container.tsx` (`DEFAULT_SLIPPAGE_BPS`, `QUOTE_TTL_MS`, `POSITION_REFETCH_MS`, `exitBuild`, `BEFORE_GRADUATION_COPY`) |
+| Referral links: `?ref=<wallet>` kept for the tab's session, passed only when the referrer's quote token account exists, self-referrals and invalid values ignored, "Your referral link" and "Copy link" | `app/src/lib/trade/referral.ts` (`parseReferrer`, `resolveReferrer`, `referralLink`); `app/src/components/trade/trade-container.tsx` (`ReferralLinkRow`, `REFERRAL_LINK_LABEL`, `REFERRAL_COPY`); DBC's referral share in [Programs reference → Native Referral](developers/programs.md#native-referral-v5) |
 | Minimum output from slippage; buy creates the accounts and wraps SOL; exit closes the wSOL account | `app/src/lib/trade/build-trade.ts` (`minOutFor`, `buildBuyTx`, `buildExitTx`); `sdk/src/instructions.ts` (`buyInstructions`, `sellInstructions`) |
 | Floor labels and captions; floor = `refund_for(basis, fee)` | `app/src/components/trade/floor-callout.tsx`; `sdk/src/quote.ts` (`refundFor`, `floorValue`); `zpvp/programs/zpvp_router/src/math.rs` (`refund_for`, `HAIRCUT_PER_EXIT`, `DUST_PER_BUY`, test `refund_matches_python_reference`) |
 | Basis, partial exits, buffer, error codes, position rent | [Programs reference](developers/programs.md) (`buy`, `sell`, `claim_surplus`, error codes); `zpvp/programs/zpvp_router/src/lib.rs` |
 | Auto-Exit presets, UTC custom deadline from 60 s to one year, consent and cancel copy | `app/src/components/trade/auto-exit-control.tsx` (`PRESETS`, `MIN_LEAD_SECONDS`, `MAX_LEAD_SECONDS`, `approvalNote`, `CANCEL_NOTE`) |
-| Set = approve the market PDA for `u64::MAX` + `set_auto_exit`; clear = `set_auto_exit(0)` + revoke | `app/src/lib/trade/build-auto-exit.ts`; `sdk/src/instructions.ts` (`setAutoExitInstructions`); [Programs reference → set_auto_exit](developers/programs.md#set_auto_exit-v5) |
+| Set = create the owner's quote token account if missing + approve the market PDA for `u64::MAX` + `set_auto_exit`; clear = `set_auto_exit(0)` + revoke; Revoke approval = one Token-2022 revoke | `app/src/lib/trade/build-auto-exit.ts` (`buildAutoExitTx`, `buildRevokeApprovalTx`); `sdk/src/instructions.ts` (`setAutoExitInstructions`); [Programs reference → set_auto_exit](developers/programs.md#set_auto_exit-v5) |
+| When Revoke approval appears, and its note | `app/src/components/trade/auto-exit-control.tsx` (`REVOKE_LABEL`, `REVOKE_NOTE`, `revokeOfferOf`); `app/src/components/trade/trade-container.tsx` (delegate read) |
 | `auto_exit` rules: whole position, refund to the owner's quote token account, errors 6010, 6020 and 6021; a partial exit keeps the deadline | [Programs reference → auto_exit](developers/programs.md#auto_exit-v5) and [sell](developers/programs.md#sell); `zpvp/programs/zpvp_router/src/lib.rs` (test `a_partial_exit_keeps_the_deadline`) |
 | Crank creates a missing quote token account only above 0.25 SOL by default | `worker/src/config.ts` (`DEFAULT_MIN_ATA_VALUE_LAMPORTS`); `worker/src/crank/jobs/auto-exit.ts` and `claims.ts` (CRK-10 headers) |
-| Crank jobs merged; registration in the running crank in progress (CRK-07) | `worker/src/crank/jobs/`; `worker/src/index.ts` (`JOBS`, header comment) |
+| The crank registers every job; an unattended 180 s devnet run finalized, migrated and claimed 6 positions with no job errors | `worker/src/index.ts` (`buildJobs`, header comment); `worker/src/crank/jobs/`; `worker/out/crank-run-devnet.json` (commit `48319aa`) |
 | Graduated banner titles, migration note, claim slab | `app/src/components/token/graduated-banner.tsx` |
 | Claim flow: on-chain re-read, "Already claimed", "Not claimable yet", ATA created if missing | `app/src/components/portfolio/portfolio-container.tsx` (`runClaim`, `ALREADY_CLAIMED`, `NOT_FINALIZED`); `app/src/lib/claim/build-claim.ts` |
 | Surplus share = `floor(surplusSnapshot × basis ÷ basisSnapshot)`; floor 0 and claimable set once finalized | `app/src/lib/server/positions.ts` (`surplusShare`, `toPositionView`); `zpvp/programs/zpvp_router/src/math.rs` (`surplus_share`) |
 | Portfolio columns, states and totals | `app/src/components/portfolio/positions-table.tsx`, `portfolio-summary.tsx`; `app/src/app/portfolio/page.tsx` |
 | Error messages | `app/src/lib/tx/error-copy.ts` (`COPY`); `app/src/components/trade/trade-container.tsx` (`QUOTE_FAILED_COPY`) |
 | Wallets detected automatically | `app/src/components/providers/app-providers.tsx` (`WALLETS`) |
-| QA-02 devnet run: 13 steps, 13 passed, 0 failed; floor and refund 7,350,732; surplus 15,045,373 and claims 15,045,370; market, DAMM v2 pool and signatures | `worker/scripts/e2e-devnet.ts`; `worker/out/e2e-devnet.json` (`summary`, `accounts`, steps 1, 3, 7, 9, 10 and 11) |
+| QA-05 devnet run: 13 steps, 13 passed, 0 failed, 14:16 to 14:20 UTC; floor and refund 7,350,732; surplus 15,045,373 and claims 15,045,370; market, DAMM v2 pool and signatures | `worker/scripts/e2e-devnet.ts`; `worker/out/e2e-devnet-final.json` (commit `99c8a42`: `startedAt`, `finishedAt`, `summary`, `accounts`, steps 1, 3, 7, 9, 10 and 11) |
+| QA-02 devnet run: the same 13 steps and amounts, 13:27 to 13:31 UTC | `worker/out/e2e-devnet.json` |

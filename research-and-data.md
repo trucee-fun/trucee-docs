@@ -88,7 +88,7 @@ The solvency question (can the buffer always pay every refund?) lives in the las
 ### Differential replay against the real DBC program
 
 1. `sim/export_configs.py` exports random curve configs. A zero fee is raised to DBC's 25 bps minimum.
-2. `litesvm-diff/src/harness.ts` runs the real mainnet DBC program (a dumped `.so`) inside LiteSVM. For each config it creates the config and pool, runs a random sequence of buys (PartialFill) and sells (ExactIn) from 5 traders, and records the balance deltas and the pool state after every swap.
+2. `litesvm-diff/src/harness.ts` runs the real mainnet DBC program (a dumped `.so`, `litesvm-diff/programs/dbc.so`) inside LiteSVM. For each config it creates the config and pool, runs a random sequence of buys (PartialFill) and sells (ExactIn) from 5 traders, and records the balance deltas and the pool state after every swap.
 3. `sim/replay_diff.py` replays every recorded swap through the port. A swap passes only if the port matches the chain exactly on the amount taken from the trader, the amount delivered, the resulting `sqrt_price` and the `quote_reserve`. A swap that failed on chain must also fail in the port.
 
 ```
@@ -101,7 +101,16 @@ scenarios: 100  swaps: 12000  exact matches: 12000
 mismatches: 0
 ```
 
-That is 21,000 swaps with 0 mismatches, the "bit-exact vs DBC (21k swaps)" result in `docs/trucee-plan.md`. To record new swaps instead of replaying the committed ones, run `npx tsx src/harness.ts SCENARIOS.json OUT.json [opsPerScenario]` in `litesvm-diff/`.
+That is 21,000 swaps with 0 mismatches, the "bit-exact vs DBC (21k swaps)" result in `docs/trucee-plan.md`; both replays were re-run on commit `ba6dcb1` (2026-10-11) with the same output. Replaying needs only Python and the committed recordings.
+
+To record new swaps instead of replaying the committed ones, run the harness in LiteSVM. The DBC binary is not in the repository (the DBC program is under Meteora's own licence, so we do not redistribute it), so `cd litesvm-diff && bash scripts/fetch-dbc.sh` is a required first step: it dumps the DBC program with `solana program dump` (read-only, public RPC, no keypair).
+
+```
+cd litesvm-diff
+bash scripts/fetch-dbc.sh     # required before any LiteSVM run
+npm ci
+npx tsx src/harness.ts SCENARIOS.json OUT.json [opsPerScenario]
+```
 
 ### Solvency fuzz
 
@@ -129,10 +138,10 @@ A fresh run with the router's on-chain constants (`DUST_PER_BUY = 16`, `HAIRCUT_
 cd sim && python3 run_fuzz.py --random 300 --adversarial 60 --seed 777 --haircut 2 --dust-per-buy 16
 ```
 
-All 12 sections (2,160 runs) report 0 runs with a negative buffer, a worst min buffer of 0 lamports and an identity drift of 0. The cumulative total recorded in `docs/trucee-plan.md` is 13,800 fuzz runs with no negative buffer.
+All 12 sections (2,160 runs) report 0 runs with a negative buffer, a worst min buffer of 0 lamports and an identity drift of 0 (re-run on commit `ba6dcb1`, 2026-10-11). The cumulative total recorded in `docs/trucee-plan.md` is 13,800 fuzz runs with no negative buffer.
 
 {% hint style="info" %}
-**Why the router withholds a few lamports.** Run the same seed without them (`--haircut 0 --dust-per-buy 0`, the defaults) and the buffer dips below zero in most runs, by at most 507 lamports, while the identity still holds exactly. DBC rounds in the pool's favour, and that dust has to come from somewhere. Withholding 16 lamports per buy and 2 per exit absorbs it, so the buffer stays solvent.
+**Why the router withholds a few lamports.** Run the same seed with both flags set to 0, their defaults, and the buffer dips below zero in most runs (288 of 300 random and 59 of 60 adversarial runs per section), by at most 507 lamports, while the identity still holds exactly (re-run on commit `ba6dcb1`). DBC rounds in the pool's favour, and that dust has to come from somewhere. Withholding 16 lamports per buy and 2 per exit absorbs it, so the buffer stays solvent.
 {% endhint %}
 
 The unit tests in `sim/test_sim.py` cover the port and the router on fixed cases: a round trip never returns more than was paid, an early exit never profits, a tiny-slice exit attack cannot drain the buffer, and random orderings stay solvent.

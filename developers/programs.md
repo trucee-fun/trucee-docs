@@ -21,12 +21,7 @@ Every number on this page names the file, test or command it comes from (see [So
 {% endhint %}
 
 {% hint style="info" %}
-**`main` is ahead of devnet.** `main` also contains the Retention Fee opt-in (ONC-15, commit `b3e5d99`), which is merged on `main` and not deployed. Settling the retention fees is not merged. On `main`:
-
-* the Market account is 300 bytes: five fields follow `surplus_claimed`, at offsets 274 to 299 (`basis_bought_total` u64 @274, `retention` bool @282, `fees_settled` bool @283, `fees_claimed` u64 @284, `creator_paid` u64 @292);
-* error 6024 `RetentionPresetInvalid` follows 6023.
-
-This page keeps the v5 layout (Market 274 bytes, errors up to 6023), which is what devnet runs. The new fields are appended, so every offset on this page is the same on `main`.
+**`main` and devnet run the same router.** The router source on `main` is router v5 as deployed on devnet: its `zpvp/` tree equals the one at the pinned commit `3985d1f`. Everything on this page (Market 274 bytes, errors up to 6023) holds for both.
 {% endhint %}
 
 {% hint style="info" %}
@@ -37,8 +32,8 @@ This page keeps the v5 layout (Market 274 bytes, errors up to 6023), which is wh
 
 | Program | Program ID | Devnet | Mainnet-beta |
 |---|---|---|---|
-| `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | Deployed: router v5, the capped build of `3985d1f` (sha256 `32d63bde…`, 439,104 bytes), last deployed in slot 509900704. `main` also contains the retention opt-in (ONC-15), which is not deployed | Not deployed (after HS-3) |
-| `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | Deployed, unchanged since `ec652cc` | Not deployed (after HS-3) |
+| `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | Deployed: router v5, the capped build of `3985d1f` (sha256 `32d63bde…`, 439,104 bytes), last deployed in slot 509900704 | Not deployed (after HS-3). Release: source pinned at `3985d1f`, sha256 published (`32d63bde…`) |
+| `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | Deployed, unchanged since `ec652cc` | Not deployed (after HS-3). Release: source pinned at `3985d1f`, sha256 published (`1525c836…`) |
 | Meteora DBC | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` | Meteora's program | Meteora's program |
 
 * **One ID per program on every cluster.** The IDs come from `declare_id!` in each program's `lib.rs`. The SDK exports them as `ROUTER_PROGRAM_ID`, `HOOK_PROGRAM_ID` and `DBC_PROGRAM_ID`, and `getClusterConfig()` returns the same three IDs for `devnet`, `mainnet-beta` and `localnet` (`sdk/src/constants.ts`).
@@ -484,16 +479,15 @@ Both accounts are Anchor accounts: an 8-byte discriminator, `sha256("account:<Na
 | 89 | 8 | `auto_exit_deadline` | i64 | **v5.** Unix time from which `auto_exit` may run, 0 = disabled. Cleared when an exit empties the position |
 
 * **Pinned by tests.** The Market offsets are asserted on serialized bytes by `invariant_tests::market_raw_bytes_keep_the_offsets_tests_and_clients_read`. The Position offsets are asserted by `tests::position_layout_appends_auto_exit_deadline` in `lib.rs`. The SDK reads the same offsets (`MARKET_OFFSETS` and `POSITION_OFFSETS` in `sdk/src/accounts.ts`).
-* **On `main`, not deployed.** The Market is 300 bytes, with the retention fields at offsets 274 to 299 (see the note at the top of this page).
-* **Older positions.** Positions written by the pre-v5 router (the devnet build before the v5 upgrade) are 89 bytes, without `auto_exit_deadline`. The SDK's `decodePosition` accepts both sizes and returns `autoExitDeadline: null` for the shorter one.
-* **Growth.** New fields go at the end (`docs/trucee-plan.md`, "Invariants for any refactor"). The SDK decoders accept longer data, and its fetchers never filter on `dataSize`. Filter on the discriminator instead.
-* **Queries.** `fetchAllMarkets` filters program accounts on the Market discriminator at offset 0. `fetchPositionsByOwner` filters on the Position discriminator and on `owner` at offset 8. To list one market's positions, filter on `market` at offset 40.
+* **Older accounts.** Positions written by the pre-v5 router (the devnet build before the v5 upgrade) are 89 bytes, without `auto_exit_deadline`, and the devnet router also still owns 241-byte Markets from an earlier build. The SDK's `decodePosition` accepts both Position sizes and returns `autoExitDeadline: null` for the shorter one.
+* **Growth.** New fields go at the end (`docs/trucee-plan.md`, "Invariants for any refactor"). The SDK decoders accept longer data.
+* **Queries.** `fetchAllMarkets` filters program accounts on the Market discriminator at offset 0 and on the supported Market sizes, one scan per size, so the 241-byte legacy Markets are skipped. `fetchPositionsByOwner` filters on the Position discriminator, on `owner` at offset 8 and on the 97-byte size, so it skips 89-byte pre-v5 positions. To list one market's positions, filter on the discriminator and on `market` at offset 40 (`sdk/src/accounts.ts`).
 
 ## Error codes
 
 ### Router errors (`RouterError`, 6000–6023)
 
-Messages are verbatim from `#[msg]` in `zpvp_router/src/lib.rs` and match `ROUTER_ERRORS` in `sdk/src/errors.ts`. New variants are only ever appended. The order is pinned by `invariant_tests::error_codes_6000_to_6023_keep_their_order`. `main` also has 6024 `RetentionPresetInvalid` (ONC-15), which is merged on `main` and not deployed.
+Messages are verbatim from `#[msg]` in `zpvp_router/src/lib.rs` and match `ROUTER_ERRORS` in `sdk/src/errors.ts`. New variants are only ever appended. The order is pinned by `invariant_tests::error_codes_6000_to_6023_keep_their_order`.
 
 | Code | Hex | Name | Message | Raised by |
 |---|---|---|---|---|
@@ -551,13 +545,14 @@ Messages are verbatim from `#[msg]` in `zpvp_router/src/lib.rs` and match `ROUTE
 
 ## Sources
 
-All program paths are under `zpvp/programs/`. The router's unit tests, which pin the layouts, the error order, the preset, the referral rules and the math, were re-run while this page was written: `cd zpvp && cargo test -p zpvp_router --lib` gave **48 passed, 0 failed** on commit `ba383bb` (2026-10-11).
+All program paths are under `zpvp/programs/`. The router's unit tests, which pin the layouts, the error order, the preset, the referral rules and the math, were re-run for this page: `cd zpvp && CARGO_BUILD_JOBS=4 cargo test -p zpvp_router` gave **48 passed, 0 failed** on commit `ba6dcb1` (2026-10-11).
 
 | Claim | Source |
 |---|---|
 | Program IDs | `declare_id!` in `zpvp_router/src/lib.rs` and `zpvp_hook/src/lib.rs`; `DBC_PROGRAM_ID` in `zpvp_router/src/dbc.rs`; `sdk/src/constants.ts` |
 | Devnet runs router v5: the capped build of `3985d1f`, sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5`, 439,104 bytes, last deployed in slot 509900704 | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet`; deploy transaction `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r` (ONC-09, commit `125061c`); `docs/mainnet-deploy.md` (Pinned build); [Security](../security.md) (Upgrade authority) |
-| `main` also has the retention opt-in, not deployed: Market 300 bytes, error 6024 | commit `b3e5d99` (ONC-15): `Market` and `RouterError` in `zpvp_router/src/lib.rs`, `zpvp_router/src/invariant_tests.rs` |
+| The router source on `main` equals the pinned v5 build; mainnet release sha256 for both programs | `git rev-parse HEAD:zpvp` (`9c1e85a…`, the tree at `3985d1f`); `docs/mainnet-deploy.md` (Pinned build) |
+| SDK scans: Market sizes, the 97-byte Position size, legacy accounts skipped | `fetchAllMarkets`, `fetchPositionsByOwner` and the file header in `sdk/src/accounts.ts` |
 | Mainnet deploy step HS-3 | `docs/aziz-handoff.md` |
 | Quote mints and caps | `QUOTE_CAPS` in `zpvp_router/src/lib.rs`; decimals, token programs and clusters in `sdk/src/constants.ts` |
 | Instructions, arguments, account order and checks | `#[program]` and the `#[derive(Accounts)]` structs in `zpvp_router/src/lib.rs`; `zpvp_router/src/dbc.rs`; `zpvp_hook/src/lib.rs`; builders in `sdk/src/instructions.ts` |

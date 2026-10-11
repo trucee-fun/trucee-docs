@@ -8,26 +8,29 @@ Apart from the Shipped section, nothing below is live on any network. A roadmap 
 
 ## Shipped
 
+Router v5 is the router on devnet, deployed on 2026-10-11 in slot 509900704. It is also the build pinned for mainnet: source pinned at `3985d1f`, sha256 published (see [Security → Upgrade authority](security.md#upgrade-authority)). Its on-chain features:
+
+* **Core:** cost basis per position, exit at cost from a per-market buffer, the surplus split at graduation, and the transfer hook that keeps every pre-graduation trade inside the router.
+* **Auto-Exit:** set a deadline, and if the curve has not graduated by then, anyone can exit your whole position at cost for you.
+* **Anti-Whale cap:** no buy may leave one position above 20% of the curve's sale supply.
+* **Native Referral:** a buy may name a referrer (see below).
+* **Preset checks:** `init_market` opens a market only for a config with no creator allocation, dynamic supply, permanently locked liquidity, DAMM v2 migration with no migration fee, and an immutable token authority.
+
+[How it works](how-it-works.md) describes each of them.
+
 ### Native Referral
 
-Shipped in router v5, live on devnet since the router v5 upgrade (2026-10-11). Without a referrer, the router passes an empty placeholder as the referral account when it calls Meteora DBC's `swap2_with_transfer_hook`. With Native Referral, a buy can pass a referrer's quote token account instead, so the referrer earns a cut of the trading fee on the trades they refer.
+Without a referrer, the router passes an empty placeholder as the referral account when it calls Meteora DBC's `swap2_with_transfer_hook`. With Native Referral, a buy can pass a referrer's quote token account instead, so the referrer earns a cut of the trading fee on the trades they refer. In the web app, a token page link with `?ref=<wallet>` names that wallet as the referrer (see [For traders → Referral links](traders.md#referral-links)).
 
 DBC pays the referral cut out of the **protocol** fee (20% of the protocol share). The buyer's cost and the exit-at-cost refund do not change. Details: [Programs reference](developers/programs.md).
 
 ## In progress
 
-This feature is in the hackathon scope but not merged yet. If it is not merged by the scope freeze (2026-10-12 12:00 UTC), it stays on this roadmap.
+The hackathon's on-chain scope is router v5 above. Retention Fee, the last router feature in that scope, was cut before the scope freeze (2026-10-12 12:00 UTC); see [Research](#research). What is still in progress is off-chain:
 
-### Retention Fee
-
-A smaller variant of the original design. Creators are paid for buyers who hold, not for buyers who flip:
-
-* The market's share of DBC trading fees (80%; the protocol keeps 20%) goes to a Trucee-controlled account instead of the creator.
-* After the curve completes, anyone can settle the fees. The creator receives `fees × retention`, where retention is the share of all bought cost basis that is still held at graduation.
-* The rest of the fees, and all of DBC's partner surplus, go to holders.
-* It is opt-in per market. Markets created before it lands keep their current fee setup.
-
-Known caveat: round-trip flipping lowers the creator's pay, and a creator who buys and holds their own token raises it at the cost of locking up their own capital.
+* **Devnet hosting.** The web app and the crank are being set up on AWS for a public devnet demo. Nothing is publicly hosted yet; today they run locally against devnet.
+* **A verifiable mainnet build.** A `solana-verify` build of both programs, so anyone can check the deployed bytes against the source. It is blocked until the owner's build machine is ready. Until then the mainnet release is described as source pinned at `3985d1f`, sha256 published.
+* **Mainnet deploy.** The owner deploys the hook and router v5 to mainnet with the same program IDs as devnet. Neither program is on mainnet yet.
 
 ## Planned features
 
@@ -35,7 +38,7 @@ Known caveat: round-trip flipping lowers the creator's pay, and a creator who bu
 
 Today an exit before graduation refunds your cost basis minus the trading fee and a small rounding haircut. Zero-Loss Exit would use the partner's share of trading fees to pay back the exit fee, so the most you lose on an exit is roughly the protocol's share of the fee.
 
-It draws on the same fee pot as Retention Fee, so the two cannot both ship.
+It would draw on the same fee pot as Retention Fee (see [Research](#research)), so the two cannot both ship.
 
 ### Wallet-Native Basis
 
@@ -71,4 +74,20 @@ These ideas are listed in our plan by name only. They have no specification, cod
 
 ## Research
 
-* **Real-pool replay.** Our sniper numbers come from simulated order flow, not from real pools (see [Research & data](research-and-data.md)). Replaying real mainnet DBC pools needs mass mainnet RPC reads and is planned for later.
+### Retention Fee
+
+Retention Fee: researched and built to a security review; the review found the push-based settle could let a creator block holders' surplus, so it was cut; the known fix is a pull model (creator claims, finalize snapshots buffer minus owed).
+
+The idea is to pay creators for buyers who hold, not for buyers who flip:
+
+* The market's share of DBC trading fees (80%; the protocol keeps 20%) would go to a Trucee-controlled account instead of the creator.
+* After the curve completes, the creator would be owed `fees × retention`, where retention is the share of all bought cost basis that is still held at graduation.
+* The rest of the fees, and all of DBC's partner surplus, would go to holders.
+
+In the reviewed design, a settle step pushed the creator's pay straight to the creator's token account. A creator can make that transfer fail forever, so settling never succeeds, and the surplus could never be finalized for holders. The pull model fixes this: settling only records what the creator is owed, the creator claims it with a separate instruction, and `finalize` snapshots the buffer minus what is still owed. None of this code is in the router source or on any network.
+
+Known caveat of the idea itself: round-trip flipping lowers the creator's pay, and a creator who buys and holds their own token raises it at the cost of locking up their own capital.
+
+### Real-pool replay
+
+Our sniper numbers come from simulated order flow, not from real pools (see [Research & data](research-and-data.md)). Replaying real mainnet DBC pools needs mass mainnet RPC reads and is planned for later.

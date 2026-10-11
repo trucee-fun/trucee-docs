@@ -34,15 +34,18 @@ Trucee changes three things before graduation. Everything else is a normal DBC l
 As far as public sources show, no other launchpad on DBC or elsewhere offers a cost-basis exit before graduation. Transfer hooks themselves are common on DBC. Trucee runs on unmodified DBC transfer-hook pools (the router calls DBC's `swap2_with_transfer_hook`), so the same rules can be adopted by any DBC launchpad.
 
 {% hint style="info" %}
-**Live on devnet with router v5.** The router also has **Auto-Exit** (set a deadline; if the curve has not completed by then, anyone can trigger your exit at cost and the refund goes to your own account) and an **Anti-Whale cap** (a buy may not leave one position above 20% of the curve's base supply, so a curve needs at least five positions to graduate). Both run on devnet since the router v5 upgrade on 2026-10-11.
+**Live on devnet with router v5.** Router v5 was deployed to devnet on 2026-10-11 (slot 509900704), and it is the router build pinned for mainnet: source pinned at `3985d1f`, sha256 published. Besides the three changes above, router v5 has **Auto-Exit** (set a deadline; if the curve has not completed by then, anyone can trigger your exit at cost and the refund goes to your own account), an **Anti-Whale cap** (a buy may not leave one position above 20% of the curve's base supply, so a curve needs at least five positions to graduate), **Native Referral** (a buy can name a referrer, who gets part of the protocol fee) and **preset checks** (a market opens only for a launch with no creator allocation, permanently locked liquidity and an immutable mint authority).
+
+No further router upgrade is planned for the hackathon. The one that was planned, for Retention Fee, was cut; Retention Fee is research on the [Roadmap](roadmap.md).
 {% endhint %}
 
 ## Proof so far
 
 * A Python port of the DBC curve matches the on-chain program swap for swap (21,000 swaps).
 * 13,800 randomized fuzz runs never produced a negative buffer.
-* 36 negative tests.
-* The devnet end-to-end run on router v5 passes 15 of 15 checks, and the full lifecycle (launch, buy, exit at cost, graduation, DAMM v2 migration, surplus claim) has run on devnet.
+* 36 negative tests, plus LiteSVM suites for Auto-Exit, the cap, referrals, the preset and the launch caps, all against the real DBC program.
+* The final devnet end-to-end run on router v5 walked the whole journey (launch, buys, exit at cost, Auto-Exit, graduation, DAMM v2 migration, surplus claims) and passed 13 of 13 checks. A separate 15/15 smoke run on router v5 saw the cap reject 14 of 40 random trades live.
+* Trucee's crank ran unattended on devnet and finalized, migrated and claimed a graduated market on its own.
 
 Commands, limits and known risks are on the [Security](security.md) and [Research & data](research-and-data.md) pages.
 

@@ -29,7 +29,9 @@ The web app's **Launch** page (`/launch`) runs the whole launch from one form. T
 | Graduation threshold | Yes | Above 0 and at most the quote token's cap. At most 9 decimal places for SOL and 8 for xStocks |
 | Initial buy | No | From 0 up to the graduation threshold. Leave it empty to skip it. See [Your initial buy](#your-initial-buy) |
 
-The pool writes the name, the symbol and a link to the metadata file on chain, and the preset makes them permanent (see [What the preset fixes](#what-the-preset-fixes)). The image, description and links are stored in the metadata file. On devnet, the app stores that file and the image on its own server.
+The pool writes the name, the symbol and a link to the metadata file on chain, and the preset makes them permanent (see [What the preset fixes](#what-the-preset-fixes)). The image, description and links are stored in the metadata file. The app stores that file and the image itself and serves them from its own metadata endpoint: on local disk when it runs on your machine, or in a private S3 bucket when a hosted deployment sets one. Nothing is publicly hosted yet.
+
+The metadata upload has two limits against abuse. By default it accepts at most 10 uploads per hour from one client IP address, and it pauses new uploads once the stored files reach a total size cap, 200 MB by default. When either limit applies, step 1 fails with "Metadata upload failed" and the server's reason (`rate_limited` or `storage_full`), and nothing is created on chain.
 
 ### Quote tokens and thresholds
 
@@ -84,7 +86,7 @@ You choose only the fields in the form. The preset fixes the rest, and it is the
 | Rule | Value | What it means for you | Router error |
 | --- | --- | --- | --- |
 | Creator allocation | None (no DBC locked vesting) | You get tokens only by buying on the curve, at the curve price, like everyone else | 6023 |
-| Token supply | Dynamic | DBC mints only what the curve needs and burns unsold tokens at migration. The leftover receiver, your wallet in the app, receives nothing | 6023 |
+| Token supply | Dynamic | DBC mints only what the curve needs and burns unsold tokens at migration, so nobody, you included, receives unsold supply | 6023 |
 | Liquidity after graduation | 100% permanently locked, with no LP vesting | Nobody, you included, can ever withdraw the DAMM v2 liquidity | 6023 |
 | Migration | DAMM v2, migration fee 0% | Nobody takes a cut of the graduation quote | 6023 |
 | Token authority | Immutable | Nobody holds the mint authority, so nobody can mint more tokens. The on-chain name, symbol and metadata link can never change | 6023 |
@@ -129,7 +131,7 @@ Your share accrues in the DBC pool, and the fee claimer withdraws it with DBC's 
 * **Tokens.** You have no allocation. Any tokens you hold, you bought on the curve.
 
 {% hint style="info" %}
-**There is no retention fee today.** Beyond the 80% fee-claimer share above, creators earn nothing from trading. A Retention Fee is listed on the [Roadmap](roadmap.md#retention-fee). Only its first part is merged in the router source: `init_market` recognizes a market that opts in by naming the router's fee PDA as fee claimer. Nothing pays a retention fee yet. The fee settlement is not merged, none of it is on devnet, and launches from the app do not opt in. Nothing on this page depends on it.
+**Creators earn only the fee-claimer share.** Beyond the 80% fee-claimer share above, creators earn nothing from trading. A Retention Fee, which would pay creators for buyers who hold, is research on the [Roadmap](roadmap.md#retention-fee): it was cut after a security review, and none of it is in the router.
 {% endhint %}
 
 After migration, the token trades in a Meteora DAMM v2 pool under DAMM v2's own fee rules. Trucee plays no part in them.
@@ -147,11 +149,12 @@ Paths are relative to the root of the Trucee monorepo.
 | Claim | Source |
 | --- | --- |
 | Form fields, limits and messages | `app/src/components/launch/launch-schema.ts`, `launch-form.tsx`; server re-checks in `app/src/lib/server/metadata-store.ts` |
-| Metadata stored by the app on devnet | `app/src/lib/server/metadata-store.ts`; `docs/trucee-plan.md` (decision log, tech stack) |
+| Metadata stored by the app: local disk by default, a private S3 bucket when `METADATA_BUCKET` is set | `app/src/lib/server/metadata-store.ts`, `app/src/lib/server/metadata-s3.ts`; `docs/trucee-plan.md` (decision log, devnet hosting) |
+| Upload limits: 10 per hour per client IP by default, 200 MB total by default; how the form reports them | `app/src/app/api/metadata/route.ts` (`DEFAULT_POSTS_PER_IP_PER_HOUR`, `rateLimited`); `app/src/lib/server/metadata-store.ts` (`DEFAULT_MAX_TOTAL_BYTES`, `storage_full`); `app/src/lib/server/client-ip.ts`; `app/src/lib/launch/run-launch.ts` (`uploadErrorCopy`) |
 | Four steps, three signatures, keys kept in memory, the token page opens | `app/src/components/launch/launch-steps.tsx`, `launch-container.tsx`; `app/src/lib/launch/run-launch.ts` |
 | Resume after "already in use", fresh-price confirmation, no retry of other failures, link to the token page once config and pool exist | `app/src/lib/launch/run-launch.ts` (header, `resumeAfterFailure`, `confirmFreshPrice`, `LaunchPartialError`); `sdk/src/launch.ts` (`buildLaunchPlan`); `docs/trucee-plan.md` (decision log, "Market-init front-running") |
 | Resumed buy bounded at the confirmed quote less 1%, rejected by DBC with `ExceededSlippage` below that | `app/src/lib/launch/run-launch.ts` (`RESUME_SLIPPAGE_BPS`, `resumeMinOut`, `resumeLaunch`); `sdk/src/launch.ts` (`LaunchParams.initialBuyMinOut`, `buildLaunchPlan`) |
-| 1% fee; fee claimer and leftover receiver are the creator's wallet | `app/src/lib/launch/run-launch.ts` (`LAUNCH_FEE_BPS`, `launchParams`) |
+| 1% fee; the fee claimer is the creator's wallet | `app/src/lib/launch/run-launch.ts` (`LAUNCH_FEE_BPS`, `launchParams`) |
 | Preset values, SDK defaults, pool-creator share 0, pool-creation fee 0 | `sdk/src/launch.ts` (`curveParams`, `presetRules`, `zeroPvpConfigParameters`) |
 | Router checks and error codes | `zpvp/programs/zpvp_router/src/preset.rs`, `dbc.rs` (`read_config`), `lib.rs` (`init_market`, `check_launch_caps`); `docs/security-review-v5.md` |
 | Quote tokens, decimals, caps and clusters | `QUOTE_CAPS` in `zpvp/programs/zpvp_router/src/lib.rs`; `sdk/src/constants.ts` |
@@ -159,5 +162,5 @@ Paths are relative to the root of the Trucee monorepo.
 | Trading-fee split: 20% protocol, referral 20% of the protocol share, 80% to the fee claimer, claimed with DBC `claim_trading_fee` | `docs/trucee-plan.md` (sections 4 and 5, "Fee split facts"); `fee_claimer` doc comment in `zpvp/programs/zpvp_router/src/dbc.rs` |
 | xStock issuer powers | `docs/trucee-plan.md` (section 1); comment on `QUOTE_CAPS` |
 | Keepers migrate SOL pools only from 10 SOL; crank skips mainnet SOL pools below 1 SOL | `docs/trucee-plan.md` (After the freeze, decision log); `docs/research/RSC-03.md`; `worker/src/config.ts` |
-| Router v5 (capped build) runs on devnet | `docs/submission.md` ("Router v5 on devnet (ONC-09)"); `litesvm-diff/out/e2e_devnet_v6.json` |
-| No retention fee shipped: only the opt-in is merged, nothing settles or pays the fee, the app does not opt in | `check_retention_preset` and `fee_authority` in `zpvp/programs/zpvp_router/src/lib.rs` (commit `b3e5d99`); `docs/trucee-plan.md` (section 5 and decision log); `feeClaimer` in `app/src/lib/launch/run-launch.ts` |
+| Router v5 (capped build) runs on devnet | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet` (last deployed in slot 509900704); `worker/out/e2e-devnet-final.json` (the final devnet run on router v5) |
+| Retention Fee researched and cut after a security review; none of it in the router; the app's fee claimer is the creator's wallet | `docs/trucee-plan.md` (Locked on-chain scope, row 5, and decision log, "Retention Fee is cut now"); commit `29dd891` (the revert on `main`); `feeClaimer` in `app/src/lib/launch/run-launch.ts` |
