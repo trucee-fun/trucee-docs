@@ -9,7 +9,7 @@ description: >-
 On a Trucee token, the trade panel offers two actions before graduation: **Buy** and **Exit at cost**. Every buy records your cost basis. An exit pays that basis back, minus the fee at cost and a 2-lamport haircut, wherever the price is. The amount you would get back right now is shown as **Your floor**. When the curve graduates, exits at cost end, the token becomes freely transferable, and holders split the market's surplus by basis. [How it works](how-it-works.md) explains the mechanism. This page follows the screens of the Trucee web app.
 
 {% hint style="warning" %}
-**Status on 2026-10-11.** Trucee runs on Solana devnet only, with router v5. SOL is the only quote token on devnet. The programs are unaudited, and the web app is not public yet (see [Links](links.md)). Trucee's crank has jobs for Auto-Exit, `finalize` and surplus claims. They are merged and ran against a devnet market in the end-to-end run below, but the running crank does not register them yet, so an unattended run has not been shown.
+**Status on 2026-10-11.** Trucee runs on Solana devnet only, with router v5. SOL is the only quote token on devnet. The programs are unaudited, and the web app is not public yet (see [Links](links.md)). Trucee's crank has jobs for Auto-Exit, `finalize` and surplus claims. The jobs are merged, and they ran against a devnet market in the end-to-end run below. Registering them in the running crank is in progress (CRK-07), so an unattended run has not been shown yet.
 {% endhint %}
 
 ## Where things are
@@ -212,25 +212,35 @@ Above the table, one total per quote token adds up the floors of your live posit
 
 ## Proof on devnet
 
-The QA-02 end-to-end run walked one fresh SOL market (graduation threshold 0.3 SOL, 1% fee) through the whole trader journey on router v5 on devnet, using the same SDK functions as the app and the crank's real jobs. It finished with **13 passed, 0 failed**.
+The QA-02 end-to-end run walked one fresh SOL market (graduation threshold 0.3 SOL, 1% fee) through the whole trader journey on router v5 on devnet, on 2026-10-11 from 13:27 to 13:31 UTC. It used the same SDK functions as the app and ran the crank's real jobs one tick at a time against that market. It finished with **13 passed, 0 failed**.
 
 | Step | Check |
 | --- | --- |
 | 1 | Launch a wSOL market |
 | 2 | 7 traders buy. Every quote matches the router's `BuyEvent` |
-| 3 | Your floor equals the on-chain refund of a later full exit |
+| 3 | Your floor equals the on-chain refund of a later full exit, after two other buys moved the price: 7,350,732 lamports both |
 | 4 | A half exit at cost refunds exactly the quoted amount |
 | 5 | The hook rejects a direct DBC buy and a wallet-to-wallet transfer |
 | 6 | A buy above 20% of the curve supply is rejected (6022) |
-| 7 | Auto-Exit 20 seconds ahead: the crank's auto-exit job exits the position after the deadline, and the refund equals the floor |
+| 7 | Auto-Exit 20 seconds ahead: the crank's auto-exit job sends nothing before the deadline, then exits the position. The refund equals the floor, 7,350,732 lamports |
 | 8 | Graduation with no position above the cap. The hook is revoked |
-| 9 | The crank's finalize job finalizes the market |
+| 9 | The crank's finalize job finalizes the market with a surplus of 15,045,373 lamports |
 | 10 | The crank's migration job creates the DAMM v2 pool |
-| 11 | The crank's claims job closes every position. The shares add up to no more than the surplus |
+| 11 | The crank's claims job claims for all 7 positions and closes them. The shares total 15,045,370 lamports, and 3 lamports of rounding stay in the buffer |
 | 12 | A plain wallet transfer works after graduation |
 | 13 | The traders' SOL is swept back |
 
-Transaction signatures: TBD(QA-02).
+The run on Solana Explorer (devnet):
+
+| Item | Address or signature |
+| --- | --- |
+| Market | [`DdDWi1hFKSk5D2ErQk9VPUbzRDHwbr2ms7ctUdJPT7tV`](https://explorer.solana.com/address/DdDWi1hFKSk5D2ErQk9VPUbzRDHwbr2ms7ctUdJPT7tV?cluster=devnet) |
+| DAMM v2 pool after migration | [`2guf3Tfy5tEv5EDykpY6yyS2cW9TATVSZsfn13Y7Yuni`](https://explorer.solana.com/address/2guf3Tfy5tEv5EDykpY6yyS2cW9TATVSZsfn13Y7Yuni?cluster=devnet) |
+| Launch: the transaction that opens the market (step 1) | [`2BK2k34UxVxiZEQsyCrQkjmgwk1k9UntKq4cD2QnDga7BvZt3MVFjfWEmL1ooo93XqsaTYtsiCYdeocDwNbsqiPd`](https://explorer.solana.com/tx/2BK2k34UxVxiZEQsyCrQkjmgwk1k9UntKq4cD2QnDga7BvZt3MVFjfWEmL1ooo93XqsaTYtsiCYdeocDwNbsqiPd?cluster=devnet) |
+| Auto-Exit sent by the crank's job (step 7) | [`5VGEs3wYHhF5MC6WMYHHotMH6nGLJiCf9vzvyEEq1VphkK12PKSsMphebjgfgY3vG5DkELALePsuxvWrm5WrmSo3`](https://explorer.solana.com/tx/5VGEs3wYHhF5MC6WMYHHotMH6nGLJiCf9vzvyEEq1VphkK12PKSsMphebjgfgY3vG5DkELALePsuxvWrm5WrmSo3?cluster=devnet) |
+| A surplus claim sent by the crank's job (step 11) | [`4jQmiR5ZTLWrWAAcvXpyb2sMebYFLRnyBaSVGSKbKqr8A4ArA2FnwZMhn6WeY7qzGbXqQsGb84CxdTtNygoZxgGL`](https://explorer.solana.com/tx/4jQmiR5ZTLWrWAAcvXpyb2sMebYFLRnyBaSVGSKbKqr8A4ArA2FnwZMhn6WeY7qzGbXqQsGb84CxdTtNygoZxgGL?cluster=devnet) |
+
+`worker/out/e2e-devnet.json` lists every account and signature of the run, step by step.
 
 ## Sources
 
@@ -247,11 +257,11 @@ Paths are relative to the root of the Trucee monorepo.
 | Set = approve the market PDA for `u64::MAX` + `set_auto_exit`; clear = `set_auto_exit(0)` + revoke | `app/src/lib/trade/build-auto-exit.ts`; `sdk/src/instructions.ts` (`setAutoExitInstructions`); [Programs reference → set_auto_exit](developers/programs.md#set_auto_exit-v5) |
 | `auto_exit` rules: whole position, refund to the owner's quote token account, errors 6010, 6020 and 6021; a partial exit keeps the deadline | [Programs reference → auto_exit](developers/programs.md#auto_exit-v5) and [sell](developers/programs.md#sell); `zpvp/programs/zpvp_router/src/lib.rs` (test `a_partial_exit_keeps_the_deadline`) |
 | Crank creates a missing quote token account only above 0.25 SOL by default | `worker/src/config.ts` (`DEFAULT_MIN_ATA_VALUE_LAMPORTS`); `worker/src/crank/jobs/auto-exit.ts` and `claims.ts` (CRK-10 headers) |
-| Crank jobs merged but not registered in the running worker | `worker/src/crank/jobs/`; `worker/src/index.ts` (`JOBS`) |
+| Crank jobs merged; registration in the running crank in progress (CRK-07) | `worker/src/crank/jobs/`; `worker/src/index.ts` (`JOBS`, header comment) |
 | Graduated banner titles, migration note, claim slab | `app/src/components/token/graduated-banner.tsx` |
 | Claim flow: on-chain re-read, "Already claimed", "Not claimable yet", ATA created if missing | `app/src/components/portfolio/portfolio-container.tsx` (`runClaim`, `ALREADY_CLAIMED`, `NOT_FINALIZED`); `app/src/lib/claim/build-claim.ts` |
 | Surplus share = `floor(surplusSnapshot × basis ÷ basisSnapshot)`; floor 0 and claimable set once finalized | `app/src/lib/server/positions.ts` (`surplusShare`, `toPositionView`); `zpvp/programs/zpvp_router/src/math.rs` (`surplus_share`) |
 | Portfolio columns, states and totals | `app/src/components/portfolio/positions-table.tsx`, `portfolio-summary.tsx`; `app/src/app/portfolio/page.tsx` |
 | Error messages | `app/src/lib/tx/error-copy.ts` (`COPY`); `app/src/components/trade/trade-container.tsx` (`QUOTE_FAILED_COPY`) |
 | Wallets detected automatically | `app/src/components/providers/app-providers.tsx` (`WALLETS`) |
-| QA-02 devnet run: 13 steps, 13 passed, 0 failed | `worker/scripts/e2e-devnet.ts`, `worker/out/e2e-devnet.json` (QA-02) |
+| QA-02 devnet run: 13 steps, 13 passed, 0 failed; floor and refund 7,350,732; surplus 15,045,373 and claims 15,045,370; market, DAMM v2 pool and signatures | `worker/scripts/e2e-devnet.ts`; `worker/out/e2e-devnet.json` (`summary`, `accounts`, steps 1, 3, 7, 9, 10 and 11) |
