@@ -1,3 +1,168 @@
 # FAQ
 
-Draft.
+Short answers to the questions people ask most. The [Introduction](README.md) has the overview, [How it works](how-it-works.md) walks through the mechanism, and [Security](security.md) covers invariants, tests and known limits.
+
+{% hint style="info" %}
+**Status on 2026-10-11.** Trucee runs on Solana devnet and is not deployed on mainnet yet. Answers marked **v5** describe router features that are merged in the source code but not yet deployed on devnet. The v5 devnet upgrade is still pending.
+{% endhint %}
+
+## Before graduation
+
+### Why can't I transfer my tokens before graduation?
+
+Trucee records a cost basis for every position. That record only stays exact if every pre-graduation buy and exit goes through the Trucee router. A Token-2022 transfer hook enforces this. While the curve is live, the token can move only inside a transaction whose top-level instruction is the router. Wallet-to-wallet transfers, direct DBC swaps and aggregator routes all fail with the error "Pre-graduation transfers must go through the Zero-PvP router".
+
+Any way of moving tokens outside the router would reopen PvP, because a holder could sell to another buyer above cost. The token is therefore non-transferable until graduation by design. Your tokens stay in your own wallet (your associated token account) the whole time, and DBC removes the hook when the curve completes. See [What happens at graduation?](#what-happens-at-graduation).
+
+*Source: `programs/zpvp_hook/src/lib.rs` (`transfer_hook`, `TransferNotViaRouter`); `programs/zpvp_router/src/lib.rs` (`Swap.user_base` is the buyer's canonical associated token account).*
+
+### Is this a honeypot?
+
+No. Risk scanners flag tokens whose transfer hook restricts selling, so a Trucee token may get flagged. Three facts answer the concern:
+
+1. **Exits are never blocked.** Before graduation, every holder can sell back through the router at any time and receive their cost basis, minus the fee and haircut described under [What is my floor?](#what-is-my-floor). The router sells your tokens into the curve and pays your refund from the market's buffer. The router has no pause switch and no admin instruction. Its instructions are `init_market`, `buy`, `sell`, `finalize` and `claim_surplus`, plus `set_auto_exit` and `auto_exit` in v5.
+2. **DBC removes the hook at graduation.** Meteora's DBC program revokes the transfer hook on the swap that completes the curve. That happens in DBC's own code and is not a Trucee setting. From then on the token is a plain Token-2022 token that you can send and trade anywhere.
+3. **The upgrade authority is disclosed.** Both programs, the hook and the router, are upgradeable. On devnet, both have the upgrade authority `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE`. You can check it with `solana program show <program id> --url devnet`. The programs are not deployed on mainnet yet. This page will name the mainnet authority once they are.
+
+Here is what the design does restrict. Before graduation you cannot take a profit, and you cannot send the token to another wallet. Those limits are the point of the mechanism.
+
+*Source: `programs/zpvp_router/src/lib.rs` (`sell`, `exit_at_cost`, the `#[program]` module); `programs/zpvp_hook/src/lib.rs` (header: DBC `revoke_transfer_hook` in `process_swap.rs`).*
+
+### What is my floor?
+
+Your floor is your cost basis, minus the fee you would pay selling at cost, minus a 2-lamport haircut, and never below zero:
+
+```
+refund = basis − ceil(basis × fee rate) − 2 lamports
+```
+
+* **basis** is the quote that actually entered the curve on your buys, after DBC's trading fee, minus 16 lamports per buy. The 16 lamports absorb DBC's rounding, which favours the pool.
+* **fee rate** is the launch's DBC trading fee, stored as a numerator over 1,000,000,000 (10,000,000 = 1%). The fee is rounded up.
+* A partial exit uses a pro-rata share of your basis (average cost, rounded down). A full exit uses all the basis you have left.
+
+Here is an example from the router's unit tests: a basis of 1 SOL at a 1% fee refunds 0.989999998 SOL.
+
+The floor holds however far the price falls, because the router computes the refund from your basis, not from the sale price. Before graduation the floor is also your ceiling. If the price is above your cost, an exit still pays cost. The difference stays in the market's buffer and goes to the holders who still hold a position at graduation.
+
+*Source: `programs/zpvp_router/src/math.rs` (`DUST_PER_BUY = 16`, `HAIRCUT_PER_EXIT = 2`, `basis_for_buy`, `basis_for_exit`, `refund_for`, test `refund_matches_python_reference`); `programs/zpvp_router/src/lib.rs` (`buy` records the quote-reserve increase as basis).*
+
+### Is there a limit on how much I can buy?
+
+{% hint style="warning" %}
+**v5:** merged in the source code, not yet deployed on devnet.
+{% endhint %}
+
+Yes. No buy may leave a position above 20% of the curve's base supply for sale, which is the DBC config's `swap_base_amount`. A buy that would cross the cap fails with error 6022 `PositionCapExceeded`. After a partial exit you can buy back up to the cap. As a result, a curve needs at least five holders to graduate.
+
+The cap can be enforced because tokens cannot move between wallets before graduation. Someone can still split purchases across several wallets, but each extra buy pushes the price further up the curve.
+
+*Source: `programs/zpvp_router/src/lib.rs` (`ANTI_WHALE_BPS = 2000`, `anti_whale_cap`, `buy`, tests `anti_whale_cap_is_20_percent_of_swap_base_amount_floored` and `position_cap_error_is_appended_after_auto_exit_errors`).*
+
+### Can I set an exit date and walk away?
+
+{% hint style="warning" %}
+**v5:** merged in the source code, not yet deployed on devnet.
+{% endhint %}
+
+Yes, with Auto-Exit. Turning it on takes two steps:
+
+1. Store a deadline as a Unix time in the future. Setting it to 0 clears it.
+2. Approve the market's program address as the delegate of your tokens.
+
+The router uses that approval only in its auto-exit instruction. Once the deadline has passed, and while the curve is still live, anyone can trigger the exit. The router sells your whole position at cost, on the same terms as a manual exit, and pays the refund into your own quote token account. Whoever triggers the exit gains nothing. If the curve graduates first, Auto-Exit no longer applies (error 6021 `AutoExitCurveComplete`), and you keep the token, which is now free to trade, plus your share of the surplus.
+
+*Source: `programs/zpvp_router/src/lib.rs` (`set_auto_exit`, `auto_exit`, `auto_exit_swap_accounts`, `is_valid_auto_exit_deadline`, `is_auto_exit_due`, errors 6019–6021).*
+
+## Graduation
+
+### What happens at graduation?
+
+A curve graduates when its quote reserve reaches the launch's migration threshold. In the current build, a SOL-quoted launch can set that threshold at 10 SOL at most (see [What can I pay with?](#what-can-i-pay-with)). After that:
+
+1. **The hook comes off.** On the swap that completes the curve, DBC revokes the transfer hook. Your tokens stayed in your wallet all along and now become a plain Token-2022 token that you can send and trade anywhere.
+2. **Exits at cost end.** Nobody can sell into a completed curve, so the router stops paying refunds. Your position is now simply the tokens you hold.
+3. **The pool migrates to DAMM v2.** DBC moves the liquidity into a Meteora DAMM v2 pool, where the token trades normally. A crank sends the migration transaction, and Trucee's own crank for this is still in development.
+4. **The surplus is paid out.** Anyone can call `finalize`, which freezes the market's buffer as the surplus and records the total basis still held. Each holder then receives `surplus × their basis ÷ total basis`, rounded down, into their own quote token account. Anyone can trigger that claim for you, and it always pays you. When it closes your position account, the account's rent deposit also goes back to you.
+
+Steps 3 and 4 do not depend on each other. The surplus is whatever exits left in the buffer (sale proceeds minus refunds). Its size therefore depends on trading before graduation, and it can be zero.
+
+*Source: `programs/zpvp_hook/src/lib.rs` (header); `programs/zpvp_router/src/lib.rs` (`QUOTE_CAPS`, `finalize`, `claim_surplus`, `ClaimSurplus` closes the position to its owner); `programs/zpvp_router/src/math.rs` (`surplus_share`).*
+
+### What if the curve never graduates?
+
+You can still exit at cost whenever you want. The router has no expiry date, and no instruction closes a market that has not graduated. Until you exit:
+
+* the token stays non-transferable;
+* no surplus is paid, because `finalize` requires a completed curve;
+* the rent deposit for your 97-byte position account stays locked, because a position only closes when its surplus is claimed after graduation.
+
+With Auto-Exit (v5) you can choose your exit date in advance.
+
+*Source: `programs/zpvp_router/src/lib.rs` (`Market` has no expiry field; `finalize` checks `CurveNotComplete`; test `position_layout_appends_auto_exit_deadline`).*
+
+## Costs
+
+### What fees do I pay?
+
+| Cost | Amount | Where it goes |
+| --- | --- | --- |
+| DBC trading fee on a buy | The launch's fixed base fee, set in its DBC config and charged in the quote token on your input | DBC splits it between Meteora's protocol share and the launch's partner and creator |
+| Fee at cost on an exit | `ceil(basis × fee rate)`, deducted from your refund | Stays in the market's buffer, which is paid to holders at graduation |
+| Rounding reserve | 16 lamports per buy, left out of your basis | Absorbs DBC's rounding in the pool's favour |
+| Exit haircut | 2 lamports per exit, deducted from your refund | Stays in the market's buffer |
+| Solana | Network fees, plus the rent deposit for your position account | The rent comes back when the position closes after graduation |
+
+When you exit, the router sells your tokens into the curve. DBC's sell fee comes out of that sale's proceeds, which go to the buffer. You pay the fee at cost instead.
+
+Trucee itself takes no fee. The router has no fee account, and the only quote it pays out goes from the market's buffer to holders, as refunds and surplus shares. The router accepts only fixed fees. It rejects configs with a fee scheduler, a rate limiter or a dynamic (volatility) fee (`UnsupportedFeeConfig`), so the fee rate at launch is also the fee rate at exit.
+
+*Source: `programs/zpvp_router/src/dbc.rs` (`read_config`: static base fee, no dynamic fee, fees collected in the quote token, buy fee on input and sell fee on output); `programs/zpvp_router/src/math.rs`; `programs/zpvp_router/src/lib.rs` (`exit_at_cost`, `claim_surplus`).*
+
+### What can I pay with?
+
+The current build accepts three quote tokens. Each one caps how much a curve can hold before it graduates:
+
+| Quote token | Graduation threshold cap |
+| --- | --- |
+| SOL (as wrapped SOL) | 10 SOL |
+| TSLAx (xStocks) | 5 shares |
+| NVDAx (xStocks) | 10 shares |
+
+Devnet launches use SOL. Devnet has no xStock mints, so xStock markets are tested only in LiteSVM against mainnet snapshots. Note that the issuer of an xStock can pause or claw back balances of that token.
+
+*Source: `programs/zpvp_router/src/lib.rs` (`QUOTE_CAPS`, `check_launch_caps`).*
+
+## Trust
+
+### Is Trucee audited?
+
+No. Both programs are unaudited. They have had internal reviews, and they come with these test suites:
+
+* A Python port of the DBC curve matches the on-chain program swap for swap over 21,000 swaps.
+* 13,800 randomized fuzz runs of the refund accounting never produced a negative buffer.
+* 36 negative tests cover account substitution, hook bypass and lifecycle abuse.
+* LiteSVM suites run against the real DBC program and cover Auto-Exit, the per-position cap, the launch caps and xStock quotes.
+* A devnet end-to-end run covered the full lifecycle (launch, buy, exit at cost, graduation, DAMM v2 migration, surplus claim) with the previous router build. A 15/15 smoke run passed on the capped build that is now on devnet.
+
+A formal review of the v5 router is pending. Because the code is unaudited, the default build limits the accepted quote tokens and caps graduation sizes (see [What can I pay with?](#what-can-i-pay-with)).
+
+*Source: `sim/test_sim.py`, `sim/replay_diff.py`, `sim/run_fuzz.py`, `litesvm-diff/src/zpvp_negative.ts`, `zpvp_auto_exit.ts`, `zpvp_anti_whale.ts`, `zpvp_caps.ts`, `zpvp_xstocks.ts`, `zpvp_e2e.ts`.*
+
+### Where is Trucee deployed?
+
+| Program | Devnet program ID |
+| --- | --- |
+| Hook (`zpvp_hook`) | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` |
+| Router (`zpvp_router`) | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` |
+
+Devnet runs the capped router build without the v5 features. Its upgrade transaction is `3MujRv1kxL92cPVWXAbXrqeaVF4BbuTdFZJnwvzbjrCGeTuXRQ1tPCxVRnkXiFx3Y3Ayep2N25HX9ztgYNDZeiZ4`. Auto-Exit and the per-position cap are merged in the source code and will reach devnet with the v5 upgrade. Neither program is deployed on mainnet yet. For the upgrade authority, see [Is this a honeypot?](#is-this-a-honeypot).
+
+*Source: `programs/zpvp_hook/src/lib.rs` and `programs/zpvp_router/src/lib.rs` (`declare_id!`).*
+
+## Wallets
+
+### Which wallets work?
+
+No wallet is verified yet. We are testing compatibility with Phantom, Backpack and Solflare, specifically signing router transactions for Token-2022 transfer-hook tokens. This answer will list the results once the tests are done.
+
+Whatever wallet you use, its own Send and Swap features will fail for a Trucee token until graduation, because the hook rejects any transfer that does not come through the router. Buys and exits go through the Trucee router, which the Trucee app and SDK call for you. Both the app and the SDK are still in development. After graduation, the token works like any other Token-2022 token.
