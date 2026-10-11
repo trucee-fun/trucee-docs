@@ -6,6 +6,12 @@ Short answers to the questions people ask most. The [Introduction](README.md) ha
 **Status on 2026-10-11.** Trucee runs on Solana devnet and is not deployed on mainnet yet. Answers marked **v5** describe router features that are merged in the source code but not yet deployed on devnet. The v5 devnet upgrade is still pending.
 {% endhint %}
 
+## General
+
+### Is Trucee a token?
+
+No. Trucee is a product, not a ticker; Trucee has no token and never had one.
+
 ## Before graduation
 
 ### Why can't I transfer my tokens before graduation?
@@ -125,8 +131,8 @@ The current build accepts three quote tokens. Each one caps how much a curve can
 | Quote token | Graduation threshold cap |
 | --- | --- |
 | SOL (as wrapped SOL) | 10 SOL |
-| TSLAx (xStocks) | 5 shares |
-| NVDAx (xStocks) | 10 shares |
+| Tokenized Tesla shares (xStocks) | 5 shares |
+| Tokenized Nvidia shares (xStocks) | 10 shares |
 
 Devnet launches use SOL. Devnet has no xStock mints, so xStock markets are tested only in LiteSVM against mainnet snapshots. Note that the issuer of an xStock can pause or claw back balances of that token.
 
