@@ -8,7 +8,7 @@ description: >-
 
 **No PvP until graduation.**
 
-Trucee is a Zero-PvP bonding curve built on [Meteora's Dynamic Bonding Curve](https://docs.meteora.ag/core-products/dbc/what-is-dbc) (DBC). Before a token graduates, every buyer can exit at their cost basis, so nobody can profit off other buyers until the curve completes. Think of it as a launchpad without victims.
+Trucee is a Zero-PvP bonding curve built on [Meteora's Dynamic Bonding Curve](https://docs.meteora.ag/core-products/dbc/what-is-dbc) (DBC). Before a token graduates, every buyer can exit at their cost basis, so nobody can profit off other buyers until the curve completes. Think of it as pump.fun without victims.
 
 {% hint style="warning" %}
 **Status:** the Trucee programs run on Solana devnet. They are unaudited and not deployed to mainnet yet. See the [Roadmap](roadmap.md).
