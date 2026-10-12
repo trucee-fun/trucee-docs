@@ -6,10 +6,10 @@ description: >-
 
 # For creators
 
-A Trucee launch is a Meteora DBC launch with one fixed preset. You choose the token's details, the quote token, the graduation threshold and an optional first buy. The preset fixes everything else, so that nobody, you included, gets tokens or liquidity without buying on the curve. Until the curve graduates, every buyer can exit at their cost basis. [How it works](how-it-works.md) explains the mechanism.
+A Trucee launch is a Meteora DBC launch with one fixed preset. You choose the token's details, the quote token, the graduation threshold and an optional first buy. The preset fixes everything else, so that nobody, you included, gets tokens or liquidity without buying on the curve. Before graduation, every buyer can exit at their cost basis, minus the fee at cost and a 2-lamport haircut. [How it works](how-it-works.md) explains the mechanism.
 
 {% hint style="warning" %}
-**Status on 2026-10-11.** Trucee runs on Solana devnet only. Devnet runs router v5, the capped build, so every on-chain rule on this page is live there. SOL is the only quote token on devnet. Trucee is not deployed on mainnet yet. The programs are unaudited, and the web app is not public yet (see [Links](links.md)).
+**Status on 2026-10-11.** Trucee runs on Solana devnet only. Devnet runs router v5, the capped build, with the original preset checks. The current source also adds the 1% fee cap described below; the recorded deployment does not establish that change. SOL is the only quote token on devnet. Trucee is not deployed on mainnet yet. The programs are not independently reviewed, and the web app is not public yet (see [Links](links.md)).
 {% endhint %}
 
 ## Launch a token
@@ -90,14 +90,14 @@ You choose only the fields in the form. The preset fixes the rest, and it is the
 | Liquidity after graduation | 100% permanently locked, with no LP vesting | Nobody, you included, can ever withdraw the DAMM v2 liquidity | 6023 |
 | Migration | DAMM v2, migration fee 0% | Nobody takes a cut of the graduation quote | 6023 |
 | Token authority | Immutable | Nobody holds the mint authority, so nobody can mint more tokens. The on-chain name, symbol and metadata link can never change | 6023 |
-| Trading fee | Static, collected in the quote token, with no fee scheduler, rate limiter or dynamic fee. The app sets 1% | The fee rate at launch is also the rate at every exit | 6014 |
+| Trading fee | Static, at most 1% in the current source, collected in the quote token, with no fee scheduler, rate limiter or dynamic fee. The app sets 1% | Before graduation, the fee rate at launch is also the rate at every exit | 6014, 6024 |
 | Transfer hook | `zpvp_hook` | Until graduation, the token moves only through the router | 6013 |
 | Quote token and threshold | A listed quote token, threshold at most its cap | See [Quote tokens and thresholds](#quote-tokens-and-thresholds) | 6017, 6018 |
 | Base token | Token-2022, 6 decimals, 1,000,000,000 tokens, 20% of the supply goes to the DAMM v2 pool at migration | SDK defaults. The app does not change them | Not checked |
 
 Two layers enforce these rules:
 
-* **The SDK** refuses to build a config that breaks any rule and names each broken rule (`assertPreset` in `sdk/src/launch.ts`).
+* **The SDK** refuses to build a config that breaks any rule and names each broken rule (`assertPreset` in [src/launch.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/launch.ts)).
 * **The router** checks the config once, in `init_market`, and refuses to open a market for a config that breaks any rule. 6023 `PresetNotAllowed` covers the first five rows. DBC never changes a config after it is created, so a market keeps these rules for life.
 
 The byte-level checks are listed under [Programs reference → Zero-PvP preset](developers/programs.md#zero-pvp-preset-v5).
@@ -108,7 +108,7 @@ Launching gives you no control over the market. The router has no admin instruct
 
 ### The trading fee
 
-Every launch from the app has a static 1% trading fee (`LAUNCH_FEE_BPS = 100`). DBC charges it in the quote token. On a buy, the fee comes out of the buyer's input. On an exit, the router sells the tokens into the curve and the fee comes out of that sale's proceeds. If you launch with the SDK, you choose the fee yourself (`feeBps`). The router only requires a static fee.
+Every launch from the app has a static 1% trading fee (`LAUNCH_FEE_BPS = 100`). DBC charges it in the quote token. On a buy, the fee comes out of the buyer's input. On an exit, the router sells the tokens into the curve and the fee comes out of that sale's proceeds. If you launch with the SDK, you choose the fee yourself (`feeBps`). The current router source requires a static fee of at most 1% (100 bps); `init_market` rejects a higher rate with `FeeTooHigh` (6024).
 
 The same rate sets your holders' exit cost: each refund is cut by the fee at cost (see [FAQ → What fees do I pay?](faq.md#what-fees-do-i-pay)). A higher fee earns the fee claimer more, but it also makes every exit at cost more expensive for your buyers.
 
@@ -144,23 +144,23 @@ After migration, the token trades in a Meteora DAMM v2 pool under DAMM v2's own 
 
 ## Sources
 
-Paths are relative to the root of the Trucee monorepo.
+Source links point to the published repositories.
 
 | Claim | Source |
 | --- | --- |
-| Form fields, limits and messages | `app/src/components/launch/launch-schema.ts`, `launch-form.tsx`; server re-checks in `app/src/lib/server/metadata-store.ts` |
-| Metadata stored by the app: local disk by default, a private S3 bucket when `METADATA_BUCKET` is set | `app/src/lib/server/metadata-store.ts`, `app/src/lib/server/metadata-s3.ts`; `docs/trucee-plan.md` (decision log, devnet hosting) |
-| Upload limits: 10 per hour per client IP by default, 200 MB total by default; how the form reports them | `app/src/app/api/metadata/route.ts` (`DEFAULT_POSTS_PER_IP_PER_HOUR`, `rateLimited`); `app/src/lib/server/metadata-store.ts` (`DEFAULT_MAX_TOTAL_BYTES`, `storage_full`); `app/src/lib/server/client-ip.ts`; `app/src/lib/launch/run-launch.ts` (`uploadErrorCopy`) |
-| Four steps, three signatures, keys kept in memory, the token page opens | `app/src/components/launch/launch-steps.tsx`, `launch-container.tsx`; `app/src/lib/launch/run-launch.ts` |
-| Resume after "already in use", fresh-price confirmation, no retry of other failures, link to the token page once config and pool exist | `app/src/lib/launch/run-launch.ts` (header, `resumeAfterFailure`, `confirmFreshPrice`, `LaunchPartialError`); `sdk/src/launch.ts` (`buildLaunchPlan`); `docs/trucee-plan.md` (decision log, "Market-init front-running") |
-| Resumed buy bounded at the confirmed quote less 1%, rejected by DBC with `ExceededSlippage` below that | `app/src/lib/launch/run-launch.ts` (`RESUME_SLIPPAGE_BPS`, `resumeMinOut`, `resumeLaunch`); `sdk/src/launch.ts` (`LaunchParams.initialBuyMinOut`, `buildLaunchPlan`) |
-| 1% fee; the fee claimer is the creator's wallet | `app/src/lib/launch/run-launch.ts` (`LAUNCH_FEE_BPS`, `launchParams`) |
-| Preset values, SDK defaults, pool-creator share 0, pool-creation fee 0 | `sdk/src/launch.ts` (`curveParams`, `presetRules`, `zeroPvpConfigParameters`) |
-| Router checks and error codes | `zpvp/programs/zpvp_router/src/preset.rs`, `dbc.rs` (`read_config`), `lib.rs` (`init_market`, `check_launch_caps`); `docs/security-review-v5.md` |
-| Quote tokens, decimals, caps and clusters | `QUOTE_CAPS` in `zpvp/programs/zpvp_router/src/lib.rs`; `sdk/src/constants.ts` |
-| Anti-Whale cap, five positions, 0.015 SOL buying 18.6% on the devnet test curve | `ANTI_WHALE_BPS` in `zpvp/programs/zpvp_router/src/lib.rs`; `docs/trucee-plan.md` (section 3 and decision log) |
-| Trading-fee split: 20% protocol, referral 20% of the protocol share, 80% to the fee claimer, claimed with DBC `claim_trading_fee` | `docs/trucee-plan.md` (sections 4 and 5, "Fee split facts"); `fee_claimer` doc comment in `zpvp/programs/zpvp_router/src/dbc.rs` |
-| xStock issuer powers | `docs/trucee-plan.md` (section 1); comment on `QUOTE_CAPS` |
-| Keepers migrate SOL pools only from 10 SOL; crank skips mainnet SOL pools below 1 SOL | `docs/trucee-plan.md` (After the freeze, decision log); `docs/research/RSC-03.md`; `worker/src/config.ts` |
-| Router v5 (capped build) runs on devnet | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet` (last deployed in slot 509900704); `worker/out/e2e-devnet-final.json` (the final devnet run on router v5) |
-| Retention Fee researched and cut after a security review; none of it in the router; the app's fee claimer is the creator's wallet | `docs/trucee-plan.md` (Locked on-chain scope, row 5, and decision log, "Retention Fee is cut now"); commit `29dd891` (the revert on `main`); `feeClaimer` in `app/src/lib/launch/run-launch.ts` |
+| Form fields, limits and messages | [src/components/launch/launch-schema.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/components/launch/launch-schema.ts), [src/components/launch/launch-form.tsx](https://github.com/trucee-fun/trucee-app/blob/main/src/components/launch/launch-form.tsx); server re-checks in [src/lib/server/metadata-store.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/server/metadata-store.ts) |
+| Metadata stored by the app: local disk by default, a private S3 bucket when `METADATA_BUCKET` is set | [src/lib/server/metadata-store.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/server/metadata-store.ts), [src/lib/server/metadata-s3.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/server/metadata-s3.ts) |
+| Upload limits: 10 per hour per client IP by default, 200 MB total by default; how the form reports them | [src/app/api/metadata/route.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/app/api/metadata/route.ts) (`DEFAULT_POSTS_PER_IP_PER_HOUR`, `rateLimited`); [src/lib/server/metadata-store.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/server/metadata-store.ts) (`DEFAULT_MAX_TOTAL_BYTES`, `storage_full`); [src/lib/server/client-ip.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/server/client-ip.ts); [src/lib/launch/run-launch.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/launch/run-launch.ts) (`uploadErrorCopy`) |
+| Four steps, three signatures, keys kept in memory, the token page opens | [src/components/launch/launch-steps.tsx](https://github.com/trucee-fun/trucee-app/blob/main/src/components/launch/launch-steps.tsx), [src/components/launch/launch-container.tsx](https://github.com/trucee-fun/trucee-app/blob/main/src/components/launch/launch-container.tsx); [src/lib/launch/run-launch.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/launch/run-launch.ts) |
+| Resume after "already in use", fresh-price confirmation, no retry of other failures, link to the token page once config and pool exist | [src/lib/launch/run-launch.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/launch/run-launch.ts) (header, `resumeAfterFailure`, `confirmFreshPrice`, `LaunchPartialError`); [src/launch.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/launch.ts) (`buildLaunchPlan`) |
+| Resumed buy bounded at the confirmed quote less 1%, rejected by DBC with `ExceededSlippage` below that | [src/lib/launch/run-launch.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/launch/run-launch.ts) (`RESUME_SLIPPAGE_BPS`, `resumeMinOut`, `resumeLaunch`); [src/launch.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/launch.ts) (`LaunchParams.initialBuyMinOut`, `buildLaunchPlan`) |
+| 1% fee; the fee claimer is the creator's wallet | [src/lib/launch/run-launch.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/launch/run-launch.ts) (`LAUNCH_FEE_BPS`, `launchParams`) |
+| Preset values, SDK defaults, pool-creator share 0, pool-creation fee 0 | [src/launch.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/launch.ts) (`curveParams`, `presetRules`, `zeroPvpConfigParameters`) |
+| Router checks and error codes | [programs/zpvp_router/src/preset.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/preset.rs), [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs) (`read_config`), [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`init_market`, `check_launch_caps`); [Router v5 review](security/router-v5-review.md) |
+| Quote tokens, decimals, caps and clusters | `QUOTE_CAPS` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs); [src/constants.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/constants.ts) |
+| Anti-Whale cap, five positions, 0.015 SOL buying 18.6% on the devnet test curve | `ANTI_WHALE_BPS` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) |
+| Trading-fee split: 20% protocol, referral 20% of the protocol share, 80% to the fee claimer, claimed with DBC `claim_trading_fee` | `fee_claimer` doc comment in [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs) |
+| xStock issuer powers | `QUOTE_CAPS` comment in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) |
+| Keepers migrate SOL pools only from 10 SOL; crank skips mainnet SOL pools below 1 SOL | [src/config.ts](https://github.com/trucee-fun/trucee-worker/blob/main/src/config.ts) |
+| Router v5 (capped build) runs on devnet | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet` (last deployed in slot 509900704); [out/e2e-devnet-final.json](https://github.com/trucee-fun/trucee-worker/blob/main/out/e2e-devnet-final.json) (the final devnet run on router v5) |
+| Retention Fee researched and cut after a security review; none of it in the router; the app's fee claimer is the creator's wallet | commit `29dd891` (the revert on `main`); `feeClaimer` in [src/lib/launch/run-launch.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/launch/run-launch.ts) |

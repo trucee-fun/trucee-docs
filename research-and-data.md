@@ -1,12 +1,12 @@
 # Research & data
 
-This page collects the numbers behind Trucee and shows how to reproduce each one. Every figure comes with the command, file or external source it was taken from. File paths refer to the Trucee source repository. The simulator lives in `sim/` and needs only Python 3 (standard library, no packages).
+This page collects the numbers behind Trucee and shows how to reproduce each one. Every figure comes with the command, file or external source it was taken from. Source links point to the published repositories; commands use the [sibling workspace folders](README.md#source-repositories). The simulator lives in `sim/` and needs only Python 3 (standard library, no packages).
 
 | Claim | Number | Source |
 |---|---|---|
 | Average sniper profit, plain DBC vs the Zero-PvP router (simulated order flow) | +10.5671 SOL vs -0.0582 SOL per run | `cd sim && python3 sniper_report.py` |
-| Python port of the DBC swap math vs the real DBC program | 21,000 swaps, 0 mismatches | `sim/replay_diff.py` on the recorded LiteSVM swaps |
-| Router buffer never goes negative (solvency fuzz, on-chain dust and haircut) | 13,800 runs recorded, 0 negative; a fresh 2,160-run check also 0 | `sim/run_fuzz.py`, `docs/trucee-plan.md` |
+| Python port of the DBC swap math vs the real DBC program | 21,000 swaps, 0 mismatches | [replay_diff.py](https://github.com/trucee-fun/trucee-sim/blob/main/replay_diff.py) on the recorded LiteSVM swaps |
+| Router buffer never goes negative (solvency fuzz, on-chain dust and haircut) | 13,800 runs, 0 negative, minimum buffer 0 lamports; a separate 2,160-run check also 0 | [run_fuzz.py](https://github.com/trucee-fun/trucee-sim/blob/main/run_fuzz.py) |
 | DBC graduations that were real competition | 495 of 94,332 in 30 days | [Litmus](https://github.com/omreor/litmus) |
 
 ## 1. Sniper extraction (simulated order flow)
@@ -21,10 +21,10 @@ On a plain bonding curve, a sniper who buys first and sells into the buyers who 
 
 ### The scenario
 
-All parameters are defined in `sim/sniper_report.py` and documented in `docs/sniper-stat.md`.
+All parameters are defined in [sniper_report.py](https://github.com/trucee-fun/trucee-sim/blob/main/sniper_report.py).
 
 * 300 random curves, one scenario per curve. Both variants (plain DBC and the Zero-PvP router) get exactly the same order flow.
-* Curve: 16 segments, 28 SOL starting market cap, price multiplier 17, migration threshold 85 SOL of quote, 1% fee. Only the liquidity per segment is random (0.3 to 3 times a constant-liquidity baseline, `sim/curve_factory.py`).
+* Curve: 16 segments, 28 SOL starting market cap, price multiplier 17, migration threshold 85 SOL of quote, 1% fee. Only the liquidity per segment is random (0.3 to 3 times a constant-liquidity baseline, [curve_factory.py](https://github.com/trucee-fun/trucee-sim/blob/main/curve_factory.py)).
 * Sniper: buys first, a size between 1 and 5 SOL, and exits before graduation.
 * Retail: 60 buys follow the sniper, each sized `10^uniform(-1.5, 0.5)` SOL (about 0.03 to 3.16 SOL). A buy that would graduate the curve is skipped in both variants, so the sniper can still exit before graduation.
 * After the sniper exits, every retail buyer exits too. This is the worst case (the hype died) and shows who absorbed the loss.
@@ -53,7 +53,7 @@ $ cd sim && python3 sniper_report.py
 
 * **Plain DBC:** the sniper takes +10.5671 SOL per run on average, and retail ends at -11.4428 SOL.
 * **Zero-PvP router:** the sniper ends at -0.0582 SOL on average. The best sniper run out of all 300 still ended at -0.020464 SOL, so the sniper never made a profit in any run.
-* **Retail's -0.8175 SOL is the fee, not extraction.** Through the router, an exit refunds `basis - fee_at_cost - haircut` (`docs/trucee-plan.md`). A retail buyer who exits pays the 1% fee on the buy and the 1% fee at cost on the exit, about 2% of what they paid. The scenario makes every retail buyer exit, which is the worst case. Buyers who hold to graduation share the buffer surplus pro rata by basis instead (see [How it works](how-it-works.md)).
+* **Retail's -0.8175 SOL is the fee, not extraction.** Through the router, an exit refunds `basis - fee_at_cost - haircut`. A retail buyer who exits pays the 1% fee on the buy and the 1% fee at cost on the exit, about 2% of what they paid. The scenario makes every retail buyer exit, which is the worst case. Buyers who hold to graduation share the buffer surplus pro rata by basis instead (see [How it works](how-it-works.md)).
 * **Min buffer 0 lamports:** across all 300 runs, the per-market buffer that pays the refunds never went below zero.
 
 ### Limits
@@ -63,7 +63,7 @@ $ cd sim && python3 sniper_report.py
 
 ## 2. Contested graduations on DBC (Litmus)
 
-[Litmus](https://github.com/omreor/litmus) is an independent analytics project that classifies every DBC pool and graduation, using each pool's own transactions as evidence. Its README (snapshot 2026-09-29 15:43 UTC) reports that **of 94,332 DBC graduations in the last 30 days, only 495 were contested**. The same figure is recorded in `docs/trucee-plan.md`.
+[Litmus](https://github.com/omreor/litmus) is an independent analytics project that classifies every DBC pool and graduation, using each pool's own transactions as evidence. Its README (snapshot 2026-09-29 15:43 UTC) reports that **of 94,332 DBC graduations in the last 30 days, only 495 were contested**.
 
 How Litmus defines the terms (from its README):
 
@@ -83,13 +83,13 @@ The solvency question (can the buffer always pay every refund?) lives in the las
 
 ### Python port of the DBC swap math
 
-`sim/dbc_curve.py` is an integer port of the swap math in [Meteora's dynamic-bonding-curve program](https://github.com/MeteoraAg/dynamic-bonding-curve) (`curve.rs`, `state/virtual_pool.rs`, `state/config.rs`). Rounding directions are copied exactly. It models the quote-token fee mode with a static base fee only (no fee scheduler, rate limiter or dynamic fee), which matches the Trucee preset rule of a static, quote-collected fee (`docs/trucee-plan.md`).
+[dbc_curve.py](https://github.com/trucee-fun/trucee-sim/blob/main/dbc_curve.py) is an integer port of the swap math in [Meteora's dynamic-bonding-curve program](https://github.com/MeteoraAg/dynamic-bonding-curve) ([curve.rs](https://github.com/MeteoraAg/dynamic-bonding-curve/blob/main/programs/dynamic-bonding-curve/src/curve.rs), [state/virtual_pool.rs](https://github.com/MeteoraAg/dynamic-bonding-curve/blob/main/programs/dynamic-bonding-curve/src/state/virtual_pool.rs), [state/config.rs](https://github.com/MeteoraAg/dynamic-bonding-curve/blob/main/programs/dynamic-bonding-curve/src/state/config.rs)). Rounding directions are copied exactly. It models the quote-token fee mode with a static base fee only (no fee scheduler, rate limiter or dynamic fee), which matches the Trucee preset rule of a static, quote-collected fee.
 
 ### Differential replay against the real DBC program
 
-1. `sim/export_configs.py` exports random curve configs. A zero fee is raised to DBC's 25 bps minimum.
-2. `litesvm-diff/src/harness.ts` runs the real mainnet DBC program (a dumped `.so`, `litesvm-diff/programs/dbc.so`) inside LiteSVM. For each config it creates the config and pool, runs a random sequence of buys (PartialFill) and sells (ExactIn) from 5 traders, and records the balance deltas and the pool state after every swap.
-3. `sim/replay_diff.py` replays every recorded swap through the port. A swap passes only if the port matches the chain exactly on the amount taken from the trader, the amount delivered, the resulting `sqrt_price` and the `quote_reserve`. A swap that failed on chain must also fail in the port.
+1. [export_configs.py](https://github.com/trucee-fun/trucee-sim/blob/main/export_configs.py) exports random curve configs. A zero fee is raised to DBC's 25 bps minimum.
+2. [src/harness.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/harness.ts) runs the real mainnet DBC program (a dumped `.so`, `programs/dbc.so` (downloaded with [scripts/fetch-dbc.sh](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/scripts/fetch-dbc.sh))) inside LiteSVM. For each config it creates the config and pool, runs a random sequence of buys (PartialFill) and sells (ExactIn) from 5 traders, and records the balance deltas and the pool state after every swap.
+3. [replay_diff.py](https://github.com/trucee-fun/trucee-sim/blob/main/replay_diff.py) replays every recorded swap through the port. A swap passes only if the port matches the chain exactly on the amount taken from the trader, the amount delivered, the resulting `sqrt_price` and the `quote_reserve`. A swap that failed on chain must also fail in the port.
 
 ```
 $ cd sim
@@ -101,7 +101,7 @@ scenarios: 100  swaps: 12000  exact matches: 12000
 mismatches: 0
 ```
 
-That is 21,000 swaps with 0 mismatches, the "bit-exact vs DBC (21k swaps)" result in `docs/trucee-plan.md`; both replays were re-run on commit `ba6dcb1` (2026-10-11) with the same output. Replaying needs only Python and the committed recordings.
+That is 21,000 swaps with 0 mismatches; both replays were re-run on commit `ba6dcb1` (2026-10-11) with the same output. Replaying needs only Python and the committed recordings.
 
 To record new swaps instead of replaying the committed ones, run the harness in LiteSVM. The DBC binary is not in the repository (the DBC program is under Meteora's own licence, so we do not redistribute it), so `cd litesvm-diff && bash scripts/fetch-dbc.sh` is a required first step: it dumps the DBC program with `solana program dump` (read-only, public RPC, no keypair).
 
@@ -114,11 +114,11 @@ npx tsx src/harness.ts SCENARIOS.json OUT.json [opsPerScenario]
 
 ### Solvency fuzz
 
-`sim/zero_pvp.py` models the router. The claim under test: the buffer is at least zero at every step, for every curve and every ordering of trades, and the identity `sum(gross - basis) == sum(remaining basis) - quote_reserve` holds exactly.
+[zero_pvp.py](https://github.com/trucee-fun/trucee-sim/blob/main/zero_pvp.py) models the router. The claim under test: the buffer is at least zero at every step, for every curve and every ordering of trades, and the identity `sum(gross - basis) == sum(remaining basis) - quote_reserve` holds exactly.
 
-`sim/run_fuzz.py` tests it:
+[run_fuzz.py](https://github.com/trucee-fun/trucee-sim/blob/main/run_fuzz.py) tests it:
 
-* **Curves:** random, from 1 to 16 segments, 5 to 60 SOL starting market cap, price multiplier 2 to 120, migration threshold 10 to 400 SOL, fee 0%, 0.25%, 1% or 5%.
+* **Curves:** random, from 1 to 16 segments, 5 to 60 SOL starting market cap, price multiplier 2 to 120, migration threshold 10 to 400 SOL, fee 0%, 0.25%, 1% or 5%. This model explores fees beyond the current router's 1% cap.
 * **Traders:** 2 to 30 users and up to 400 steps per run. Buys are log-uniform from 0.001 to 50 SOL. Exits are full or partial.
 * **Drivers:** `random` picks a random action each step. `adversarial` is a greedy attacker: each step it tries every candidate action (4 buys and, once anyone holds tokens, 8 exits) and picks the one that pushes the buffer lowest.
 * **Endings:** stop at graduation, or `+full-unwind`: if the curve has not graduated when the steps run out, every holder exits in random order (a dead curve).
@@ -132,19 +132,23 @@ npx tsx src/harness.ts SCENARIOS.json OUT.json [opsPerScenario]
 | `--haircut L` | 0 | lamports withheld per exit |
 | `--dust-per-buy L` | 0 | lamports withheld per buy |
 
-A fresh run with the router's on-chain constants (`DUST_PER_BUY = 16`, `HAIRCUT_PER_EXIT = 2` in `zpvp/programs/zpvp_router/src/math.rs`):
+A fresh run with the router's on-chain constants (`DUST_PER_BUY = 16`, `HAIRCUT_PER_EXIT = 2` in [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs)):
 
 ```
 cd sim && python3 run_fuzz.py --random 300 --adversarial 60 --seed 777 --haircut 2 --dust-per-buy 16
 ```
 
-All 12 sections (2,160 runs) report 0 runs with a negative buffer, a worst min buffer of 0 lamports and an identity drift of 0 (re-run on commit `ba6dcb1`, 2026-10-11). The cumulative total recorded in `docs/trucee-plan.md` is 13,800 fuzz runs with no negative buffer.
+All 12 sections (2,160 runs) report 0 runs with a negative buffer, a worst min buffer of 0 lamports and an identity drift of 0 (re-run on commit `ba6dcb1`, 2026-10-11). The [router v5 review](security/router-v5-review.md) records a reproducible 13,800-run check with no negative buffer and a minimum buffer of 0 lamports:
+
+```bash
+cd sim && python3 run_fuzz.py --random 2000 --adversarial 300 --seed 90000 --dust-per-buy 16 --haircut 2
+```
 
 {% hint style="info" %}
 **Why the router withholds a few lamports.** Run the same seed with both flags set to 0, their defaults, and the buffer dips below zero in most runs (288 of 300 random and 59 of 60 adversarial runs per section), by at most 507 lamports, while the identity still holds exactly (re-run on commit `ba6dcb1`). DBC rounds in the pool's favour, and that dust has to come from somewhere. Withholding 16 lamports per buy and 2 per exit absorbs it, so the buffer stays solvent.
 {% endhint %}
 
-The unit tests in `sim/test_sim.py` cover the port and the router on fixed cases: a round trip never returns more than was paid, an early exit never profits, a tiny-slice exit attack cannot drain the buffer, and random orderings stay solvent.
+The unit tests in [test_sim.py](https://github.com/trucee-fun/trucee-sim/blob/main/test_sim.py) cover the port and the router on fixed cases: a round trip never returns more than was paid, an early exit never profits, a tiny-slice exit attack cannot drain the buffer, and random orderings stay solvent.
 
 ```
 cd sim && python3 -m unittest test_sim

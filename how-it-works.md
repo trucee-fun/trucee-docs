@@ -1,6 +1,6 @@
 # How it works
 
-Trucee runs a **Zero-PvP curve** on an unmodified Meteora Dynamic Bonding Curve (DBC) pool. The core idea fits in one sentence: **before graduation every buyer can exit at their cost basis, and at graduation whatever those exits left behind is shared by the holders who stayed, pro rata by basis.**
+Trucee runs a **Zero-PvP curve** on an unmodified Meteora Dynamic Bonding Curve (DBC) pool. The core idea fits in one sentence: **before graduation every buyer can exit at their cost basis minus the fee at cost and a 2-lamport haircut, and at graduation whatever those exits left behind is shared by the holders who stayed, pro rata by basis.**
 
 Two Solana programs make that work:
 
@@ -42,7 +42,7 @@ A creator launches an ordinary DBC pool from a transfer-hook config whose hook p
 
 * the pool and config are DBC transfer-hook accounts and the pool belongs to the config;
 * the config's hook program is `zpvp_hook` (error `WrongTransferHook`, 6013);
-* the base fee is static (no fee scheduler or rate limiter), the dynamic fee is off and fees are collected in the quote token (`UnsupportedFeeConfig`, 6014);
+* the base fee is static (no fee scheduler or rate limiter), the dynamic fee is off and fees are collected in the quote token (`UnsupportedFeeConfig`, 6014); the current source caps the static fee at 1% (100 bps, fee numerator 10,000,000), rejecting higher configs with `FeeTooHigh` (6024);
 * the quote mint is on the launch allowlist and the graduation threshold is within its cap (`QuoteMintNotAllowed` 6017, `ThresholdTooHigh` 6018): wSOL up to 10 SOL, TSLAx up to 5 shares, NVDAx up to 10 shares. The xStocks are Token-2022 tokens whose issuer can pause or claw back balances; the [Security](security.md) page covers that risk.
 
 The market stores the pool's fee rate (`fee_numerator`, out of 1,000,000,000) for the refund formula below.
@@ -70,7 +70,7 @@ Before graduation you can exit all or part of your position with the router's `s
 refund = basis_part − ceil(basis_part × fee_numerator ÷ 1,000,000,000) − 2
 ```
 
-floored at zero. In words: you get back what you put into the curve, minus the fee you would pay selling at your own cost, minus a **2-unit haircut** per exit that stops many tiny exits from accumulating rounding dust against the buffer.
+floored at zero. In words: you get back what you put into the curve, minus the fee you would pay selling at your own cost, minus a **2-lamport haircut** per exit on SOL markets (2 raw quote units on other markets) that stops many tiny exits from accumulating rounding dust against the buffer.
 
 **Example** (unit test `refund_matches_python_reference`): a basis of 1,000,000,000 lamports (1 SOL) on a pool with a 1% fee (`fee_numerator` 10,000,000) refunds **989,999,998 lamports**: 1 SOL minus a 0.01 SOL fee at cost minus 2 lamports.
 
@@ -142,7 +142,7 @@ cap = floor(swap_base_amount × 2,000 ÷ 10,000)
 
 ## Status
 
-As of 2026-10-11. "Devnet" is the router upgraded on 2026-10-11 to v5 (slot 509900704), the capped build of commit `3985d1f`. The router source on `main` is that same build: its `zpvp/` tree equals the one at `3985d1f`.
+As of 2026-10-11. "Devnet" is the router upgraded on 2026-10-11 to v5 (slot 509900704), the capped build of commit `3985d1f`. The current source additionally caps static fees at 1%; the recorded devnet build and its hashes predate that change.
 
 | Piece | Source on `main` | Devnet |
 | --- | --- | --- |
@@ -167,29 +167,29 @@ Devnet program IDs:
 
 ## Sources
 
-Paths are relative to the root of the Trucee monorepo. Every number on this page comes from one of these.
+Source links point to the published repositories. Every number on this page comes from one of these.
 
 | Claim | Source |
 | --- | --- |
-| Hook rule: the top-level instruction must be the router, else `TransferNotViaRouter` | `zpvp/programs/zpvp_hook/src/lib.rs` (`transfer_hook`, `HookError`) |
-| The hook rejects a direct DBC buy and a wallet transfer; DBC revoked the hook at graduation; a plain transfer works after it; selling into the completed curve fails | `litesvm-diff/src/zpvp_e2e.ts` (checks 1, 3 and 6, and the post-graduation checks) |
-| Basis = quote reserve growth − 16; the buy fee is taken from the input | `zpvp/programs/zpvp_router/src/lib.rs` (`buy`), `zpvp/programs/zpvp_router/src/math.rs` (`DUST_PER_BUY`, `basis_for_buy`), `sim/zero_pvp.py` and `sim/dbc_curve.py` (module docstrings) |
-| At most 14 lamports of DBC rounding per round trip | `zpvp/programs/zpvp_router/src/math.rs` (comment on `DUST_PER_BUY`) |
-| Refund formula, haircut 2, denominator 1,000,000,000, average-cost exits | `zpvp/programs/zpvp_router/src/math.rs` (`refund_for`, `HAIRCUT_PER_EXIT`, `FEE_DENOMINATOR`, `basis_for_exit`) |
-| 1 SOL basis at a 1% fee refunds 989,999,998 lamports | `math.rs` test `refund_matches_python_reference`; `cd zpvp && cargo test -p zpvp_router` (48 passed, 0 failed on `ba6dcb1`, 2026-10-11) |
-| Proceeds go to the buffer, the refund comes from it, `BufferInsufficient` | `zpvp/programs/zpvp_router/src/lib.rs` (`sell`, `exit_at_cost`) |
-| 21,000 swaps bit-exact; 13,800 fuzz runs with no negative buffer | `docs/trucee-plan.md` (Core mechanism, "Verified"); `sim/run_fuzz.py`, `sim/zero_pvp.py` |
-| `init_market` checks; quote caps of 10 SOL, 5 TSLAx and 10 NVDAx | `zpvp/programs/zpvp_router/src/lib.rs` (`init_market`, `QUOTE_CAPS`, `check_launch_caps`), `zpvp/programs/zpvp_router/src/dbc.rs` (`read_config`) |
-| Canonical associated token accounts only; they cannot change owner | `zpvp/programs/zpvp_router/src/lib.rs` (`Swap.user_base`) |
-| DBC revokes the hook on the completing swap | `docs/trucee-plan.md` (Core mechanism: DBC `process_swap.rs` lines 364–425); `zpvp/programs/zpvp_hook/src/lib.rs` (module doc) |
-| Partial-fill buys | `zpvp/programs/zpvp_router/src/lib.rs` (`buy`, `SWAP_MODE_PARTIAL_FILL`), `sim/dbc_curve.py` (`buy`) |
-| Surplus snapshot and pro-rata claim, rent back to the owner, `SurplusOverclaimed` | `zpvp/programs/zpvp_router/src/lib.rs` (`finalize`, `claim_surplus`), `math.rs` (`surplus_share`) |
-| Final devnet end-to-end run on router v5: 13 passed, 0 failed; surplus 15,045,373 lamports, 7 claims totalling 15,045,370; a buy above the cap rejected with 6022; DAMM v2 pool `6W3BGqQDWBJqfrEARB3jfbpWmZaAEjMESyCScnmo8TBP` | `worker/scripts/e2e-devnet.ts`; `worker/out/e2e-devnet-final.json` (commit `99c8a42`, steps 6, 9, 10 and 11); devnet migration transaction `2Pos6pHCTzpviqC2HHQ8THR27WGzMMqZGtdKFpN5KqaBDvioF6YE8d8mQyxCPVqdLsb6cmrJeuScxSn6RQXU6mJA` and first claim `4bDKeg824SZtBW27Fq1hba936nbRw5XXE2QwJDbfCzG9w54fJuAkNowWFxH9R8bAtqX18rTNDFF33TdJ6TekGAMF` |
-| Devnet router is v5: the capped build of `3985d1f`, 439,104 bytes, sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5`, last deployed in slot 509900704 | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet`; devnet deploy transaction `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r`; `docs/mainnet-deploy.md` (Pinned build) |
-| Router v5 smoke run on devnet: 15 passed, 0 failed; 14 of 40 random trades rejected with 6022 | `litesvm-diff/out/e2e_devnet_v6.json` (commit `125061c`) |
-| Auto-Exit rules; error codes 6007, 6010, 6019, 6020 and 6021 | `zpvp/programs/zpvp_router/src/lib.rs` (`set_auto_exit`, `auto_exit`, `RouterError` and its unit tests); `litesvm-diff/src/zpvp_auto_exit.ts` |
-| Anti-Whale: 2,000 bps of `swap_base_amount`, error 6022, devnet cap 37,013,573,816,224, at least 5 positions | `zpvp/programs/zpvp_router/src/lib.rs` (`ANTI_WHALE_BPS`, `anti_whale_cap` and its unit test); `litesvm-diff/src/zpvp_anti_whale.ts`; `docs/trucee-plan.md` (section 3) |
-| DAMM v2 migration on devnet with router v4 (history) | `docs/trucee-plan.md` (Core mechanism, "Verified"); `litesvm-diff/src/migrate_devnet.ts` |
-| xStock issuers can pause or claw back balances | `docs/trucee-plan.md` (section 1); `zpvp/programs/zpvp_router/src/lib.rs` (comment on `QUOTE_CAPS`) |
-| The crank (finalize, claims, auto-exit, migration) runs every job unattended; on devnet one unattended run finalized, migrated and claimed all 6 positions of market `5t7tfUeP2msicPhFihz5vcasYqwk4tKTpgQRui96oyar` | `worker/src/index.ts` (`buildJobs`); `worker/src/crank/jobs/` (`finalize.ts`, `claims.ts`, `auto-exit.ts`, `migrate.ts`); `worker/out/crank-run-devnet.json` (commit `48319aa`) |
-| Meteora's mainnet keepers migrate SOL pools only from a 10 SOL threshold | `docs/research/RSC-03.md` (Answer, E1) |
+| Hook rule: the top-level instruction must be the router, else `TransferNotViaRouter` | [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs) (`transfer_hook`, `HookError`) |
+| The hook rejects a direct DBC buy and a wallet transfer; DBC revoked the hook at graduation; a plain transfer works after it; selling into the completed curve fails | [src/zpvp_e2e.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_e2e.ts) (checks 1, 3 and 6, and the post-graduation checks) |
+| Basis = quote reserve growth − 16; the buy fee is taken from the input | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`buy`), [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) (`DUST_PER_BUY`, `basis_for_buy`), [zero_pvp.py](https://github.com/trucee-fun/trucee-sim/blob/main/zero_pvp.py) and [dbc_curve.py](https://github.com/trucee-fun/trucee-sim/blob/main/dbc_curve.py) (module docstrings) |
+| At most 14 lamports of DBC rounding per round trip | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) (comment on `DUST_PER_BUY`) |
+| Refund formula, haircut 2, denominator 1,000,000,000, average-cost exits | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) (`refund_for`, `HAIRCUT_PER_EXIT`, `FEE_DENOMINATOR`, `basis_for_exit`) |
+| 1 SOL basis at a 1% fee refunds 989,999,998 lamports | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) test `refund_matches_python_reference`; `cd zpvp && cargo test -p zpvp_router` (48 passed, 0 failed on `ba6dcb1`, 2026-10-11) |
+| Proceeds go to the buffer, the refund comes from it, `BufferInsufficient` | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`sell`, `exit_at_cost`) |
+| 21,000 swaps bit-exact; 13,800 fuzz runs with no negative buffer | [run_fuzz.py](https://github.com/trucee-fun/trucee-sim/blob/main/run_fuzz.py), [zero_pvp.py](https://github.com/trucee-fun/trucee-sim/blob/main/zero_pvp.py) |
+| `init_market` checks; quote caps of 10 SOL, 5 TSLAx and 10 NVDAx | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`init_market`, `QUOTE_CAPS`, `check_launch_caps`), [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs) (`read_config`) |
+| Canonical associated token accounts only; they cannot change owner | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`Swap.user_base`) |
+| DBC revokes the hook on the completing swap | [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs) (module doc) |
+| Partial-fill buys | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`buy`, `SWAP_MODE_PARTIAL_FILL`), [dbc_curve.py](https://github.com/trucee-fun/trucee-sim/blob/main/dbc_curve.py) (`buy`) |
+| Surplus snapshot and pro-rata claim, rent back to the owner, `SurplusOverclaimed` | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`finalize`, `claim_surplus`), [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) (`surplus_share`) |
+| Final devnet end-to-end run on router v5: 13 passed, 0 failed; surplus 15,045,373 lamports, 7 claims totalling 15,045,370; a buy above the cap rejected with 6022; DAMM v2 pool `6W3BGqQDWBJqfrEARB3jfbpWmZaAEjMESyCScnmo8TBP` | [scripts/e2e-devnet.ts](https://github.com/trucee-fun/trucee-worker/blob/main/scripts/e2e-devnet.ts); [out/e2e-devnet-final.json](https://github.com/trucee-fun/trucee-worker/blob/main/out/e2e-devnet-final.json) (commit `99c8a42`, steps 6, 9, 10 and 11); devnet migration transaction `2Pos6pHCTzpviqC2HHQ8THR27WGzMMqZGtdKFpN5KqaBDvioF6YE8d8mQyxCPVqdLsb6cmrJeuScxSn6RQXU6mJA` and first claim `4bDKeg824SZtBW27Fq1hba936nbRw5XXE2QwJDbfCzG9w54fJuAkNowWFxH9R8bAtqX18rTNDFF33TdJ6TekGAMF` |
+| Devnet router is v5: the capped build of `3985d1f`, 439,104 bytes, sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5`, last deployed in slot 509900704 | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet`; devnet deploy transaction `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r`; [Security → Upgrade authority](security.md#upgrade-authority) |
+| Router v5 smoke run on devnet: 15 passed, 0 failed; 14 of 40 random trades rejected with 6022 | [out/e2e_devnet_v6.json](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/out/e2e_devnet_v6.json) (commit `125061c`) |
+| Auto-Exit rules; error codes 6007, 6010, 6019, 6020 and 6021 | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`set_auto_exit`, `auto_exit`, `RouterError` and its unit tests); [src/zpvp_auto_exit.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_auto_exit.ts) |
+| Anti-Whale: 2,000 bps of `swap_base_amount`, error 6022, devnet cap 37,013,573,816,224, at least 5 positions | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`ANTI_WHALE_BPS`, `anti_whale_cap` and its unit test); [src/zpvp_anti_whale.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_anti_whale.ts) |
+| DAMM v2 migration on devnet with router v4 (history) | [src/migrate_devnet.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/migrate_devnet.ts) |
+| xStock issuers can pause or claw back balances | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (comment on `QUOTE_CAPS`) |
+| The crank (finalize, claims, auto-exit, migration) runs every job unattended; on devnet one unattended run finalized, migrated and claimed all 6 positions of market `5t7tfUeP2msicPhFihz5vcasYqwk4tKTpgQRui96oyar` | [src/index.ts](https://github.com/trucee-fun/trucee-worker/blob/main/src/index.ts) (`buildJobs`); [src/crank/jobs/](https://github.com/trucee-fun/trucee-worker/blob/main/src/crank/jobs/) ([src/crank/jobs/finalize.ts](https://github.com/trucee-fun/trucee-worker/blob/main/src/crank/jobs/finalize.ts), [src/crank/jobs/claims.ts](https://github.com/trucee-fun/trucee-worker/blob/main/src/crank/jobs/claims.ts), [src/crank/jobs/auto-exit.ts](https://github.com/trucee-fun/trucee-worker/blob/main/src/crank/jobs/auto-exit.ts), [src/crank/jobs/migrate.ts](https://github.com/trucee-fun/trucee-worker/blob/main/src/crank/jobs/migrate.ts)); [out/crank-run-devnet.json](https://github.com/trucee-fun/trucee-worker/blob/main/out/crank-run-devnet.json) (commit `48319aa`) |
+| Meteora's mainnet keepers migrate SOL pools only from a 10 SOL threshold | Below 10 SOL, someone else must send the permissionless DBC migration; see [Creators → Choosing a threshold](creators.md#quote-tokens-and-thresholds) |

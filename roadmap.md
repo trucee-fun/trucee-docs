@@ -36,7 +36,7 @@ The hackathon's on-chain scope is router v5 above. Retention Fee, the last route
 
 ### Zero-Loss Exit
 
-Today an exit before graduation refunds your cost basis minus the trading fee and a small rounding haircut. Zero-Loss Exit would use the partner's share of trading fees to pay back the exit fee, so the most you lose on an exit is roughly the protocol's share of the fee.
+Today an exit before graduation refunds your cost basis minus the fee at cost and a 2-lamport haircut. Zero-Loss Exit would use the partner's share of trading fees to pay back the exit fee, so the most you lose on an exit is roughly the protocol's share of the fee.
 
 It would draw on the same fee pot as Retention Fee (see [Research](#research)), so the two cannot both ship.
 

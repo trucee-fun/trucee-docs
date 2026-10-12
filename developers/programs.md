@@ -14,14 +14,14 @@ This page is for anyone who builds transactions for the two Trucee programs or r
 
 It documents router v5, the router deployed on devnet. v5 adds Auto-Exit, the Anti-Whale cap, Native Referral and the Zero-PvP preset checks. For the reasoning behind the mechanism, read [How it works](../how-it-works.md). For the invariants, tests and known limits, read [Security](../security.md).
 
-Every number on this page names the file, test or command it comes from (see [Sources](#sources)). Paths are relative to the Trucee source repository. If this page and the code disagree, trust the code.
+Every number on this page names the file, test or command it comes from (see [Sources](#sources)). Source links point to the published repositories. Commands use sibling workspace folders (see the [Introduction](../README.md#source-repositories)). If this page and the code disagree, trust the code.
 
 {% hint style="warning" %}
-**Status as of 2026-10-11:** the programs are unaudited and deployed on devnet only. The devnet router runs router v5 since its upgrade on 2026-10-11 (ONC-09), so everything marked **v5** on this page is live on devnet. Mainnet: not deployed (after HS-3).
+**Status as of 2026-10-11:** the programs are not independently reviewed and deployed on devnet only. The devnet router runs router v5 since its upgrade on 2026-10-11, so everything marked **v5** on this page is live on devnet. Mainnet: not deployed.
 {% endhint %}
 
 {% hint style="info" %}
-**`main` and devnet run the same router.** The router source on `main` is router v5 as deployed on devnet: its `zpvp/` tree equals the one at the pinned commit `3985d1f`. Everything on this page (Market 274 bytes, errors up to 6023) holds for both.
+**Current source and recorded deployment.** The current source extends router v5 with the 1% static-fee cap (`FeeTooHigh`, 6024). Market remains 274 bytes. The deployment records below describe the earlier pinned v5 build at `3985d1f`; they do not establish deployment of the fee-cap change.
 {% endhint %}
 
 {% hint style="info" %}
@@ -32,18 +32,18 @@ Every number on this page names the file, test or command it comes from (see [So
 
 | Program | Program ID | Devnet | Mainnet-beta |
 |---|---|---|---|
-| `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | Deployed: router v5, the capped build of `3985d1f` (sha256 `32d63bde…`, 439,104 bytes), last deployed in slot 509900704 | Not deployed (after HS-3). Release: source pinned at `3985d1f`, sha256 published (`32d63bde…`) |
-| `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | Deployed, unchanged since `ec652cc` | Not deployed (after HS-3). Release: source pinned at `3985d1f`, sha256 published (`1525c836…`) |
+| `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | Deployed: router v5, the capped build of `3985d1f` (sha256 `32d63bde…`, 439,104 bytes), last deployed in slot 509900704 | Not deployed. Release: source pinned at `3985d1f`, sha256 published (`32d63bde…`) |
+| `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | Deployed, unchanged since `ec652cc` | Not deployed. Release: source pinned at `3985d1f`, sha256 published (`1525c836…`) |
 | Meteora DBC | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` | Meteora's program | Meteora's program |
 
-* **One ID per program on every cluster.** The IDs come from `declare_id!` in each program's `lib.rs`. The SDK exports them as `ROUTER_PROGRAM_ID`, `HOOK_PROGRAM_ID` and `DBC_PROGRAM_ID`, and `getClusterConfig()` returns the same three IDs for `devnet`, `mainnet-beta` and `localnet` (`sdk/src/constants.ts`).
-* **The two programs pin each other.** The hook accepts only `D4sk6w…` as the router (`ROUTER_ID` in `zpvp/programs/zpvp_hook/src/lib.rs`). The router opens markets only for DBC configs whose transfer hook is `CUNNV1…` (`ZPVP_HOOK_ID` in `zpvp/programs/zpvp_router/src/lib.rs`).
-* **HS-3** is the mainnet deploy step of the hand-off plan (`docs/aziz-handoff.md`): hook and router v5, deployed with the same program IDs as devnet.
+* **One ID per program on every cluster.** The IDs come from `declare_id!` in each program's [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs). The SDK exports them as `ROUTER_PROGRAM_ID`, `HOOK_PROGRAM_ID` and `DBC_PROGRAM_ID`, and `getClusterConfig()` returns the same three IDs for `devnet`, `mainnet-beta` and `localnet` ([src/constants.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/constants.ts)).
+* **The two programs pin each other.** The hook accepts only `D4sk6w…` as the router (`ROUTER_ID` in [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs)). The router opens markets only for DBC configs whose transfer hook is `CUNNV1…` (`ZPVP_HOOK_ID` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs)).
+* **Mainnet deployment is pending.** The hook and router are intended to use the same program IDs as devnet.
 * The upgrade authority and the devnet deploy transaction are listed under [Security → Upgrade authority](../security.md#upgrade-authority).
 
 ### Quote mints per cluster
 
-The default (capped) router build accepts only these quote mints. Each has a cap on the config's graduation threshold, `migration_quote_threshold` (`QUOTE_CAPS` and `check_launch_caps` in `zpvp_router/src/lib.rs`). The `unrestricted` Cargo feature turns the check off for test builds.
+The default (capped) router build accepts only these quote mints. Each has a cap on the config's graduation threshold, `migration_quote_threshold` (`QUOTE_CAPS` and `check_launch_caps` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs)). The `unrestricted` Cargo feature turns the check off for test builds.
 
 | Quote | Mint | Decimals | Token program | Max graduation threshold (raw) | SDK clusters |
 |---|---|---|---|---|---|
@@ -51,7 +51,7 @@ The default (capped) router build accepts only these quote mints. Each has a cap
 | TSLAx | `XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB` | 8 | Token-2022 | 500,000,000 (5 shares) | `mainnet-beta`, `localnet` |
 | NVDAx | `Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh` | 8 | Token-2022 | 1,000,000,000 (10 shares) | `mainnet-beta`, `localnet` |
 
-Decimals, token programs and the cluster lists are from `sdk/src/constants.ts`. Devnet has no xStock mints, so the SDK's devnet config lists SOL only.
+Decimals, token programs and the cluster lists are from [src/constants.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/constants.ts). Devnet has no xStock mints, so the SDK's devnet config lists SOL only.
 
 ## Program-derived addresses
 
@@ -62,7 +62,7 @@ Decimals, token programs and the cluster lists are from `sdk/src/constants.ts`. 
 | Position | router | `["position", market, owner]` | `findPositionPda(market, owner)` |
 | Extra-account-metas | hook | `["extra-account-metas", base_mint]` | `findExtraAccountMetasPda(baseMint)` |
 
-There is one market per DBC pool and one position per (market, wallet). Seeds: `MARKET_SEED`, `BUFFER_SEED`, `POSITION_SEED` and the `seeds` constraints in `zpvp_router/src/lib.rs`, `EXTRA_ACCOUNT_METAS_SEED` in `zpvp_hook/src/lib.rs`, and `sdk/src/pda.ts`.
+There is one market per DBC pool and one position per (market, wallet). Seeds: `MARKET_SEED`, `BUFFER_SEED`, `POSITION_SEED` and the `seeds` constraints in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs), `EXTRA_ACCOUNT_METAS_SEED` in [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs), and [src/pda.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/pda.ts).
 
 ## Lifecycle at a glance
 
@@ -76,7 +76,7 @@ There is one market per DBC pool and one position per (market, wallet). Seeds: `
 
 ## Router instructions
 
-Instruction data is the 8-byte Anchor discriminator, `sha256("global:<name>")[..8]`, followed by the arguments in Borsh encoding (little-endian). The discriminators below match `DISCRIMINATORS` in `sdk/src/instructions.ts`.
+Instruction data is the 8-byte Anchor discriminator, `sha256("global:<name>")[..8]`, followed by the arguments in Borsh encoding (little-endian). The discriminators below match `DISCRIMINATORS` in [src/instructions.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/instructions.ts).
 
 | Instruction | Discriminator | Arguments | Signer | Who may call | SDK builder |
 |---|---|---|---|---|---|
@@ -92,7 +92,7 @@ In the account tables below, accounts are in instruction order, W means writable
 
 ### init_market
 
-Opens the router market for a DBC transfer-hook pool and creates its buffer vault. It is permissionless: every Market field is read from the pool and the config, so any caller opens the same market (`docs/trucee-plan.md`, decision log, "Market-init front-running"). Emits no event.
+Opens the router market for a DBC transfer-hook pool and creates its buffer vault. It is permissionless: every Market field is read from the pool and the config, so any caller opens the same market. Emits no event.
 
 | # | Account | W | S | Notes |
 |---|---|---|---|---|
@@ -105,21 +105,21 @@ Opens the router market for a DBC transfer-hook pool and creates its buffer vaul
 | 6 | `token_quote_program` | | | The quote mint's token program |
 | 7 | `system_program` | | | |
 
-Checks, in order (`init_market`, `dbc::read_pool`, `dbc::read_config`, `check_launch_caps`):
+Config and account checks (`init_market`, `dbc::read_pool`, `dbc::read_config`, `check_launch_caps`):
 
 1. The pool is owned by DBC (6000), is at least 416 bytes long and has the `TransferHookPool` discriminator (6001).
 2. The pool's config is `config` (6004).
 3. The config is owned by DBC (6000), is exactly 1,128 bytes long with the `ConfigWithTransferHook` discriminator (6002), and its transfer-hook program is `zpvp_hook` (6013).
-4. The fee is one the refund math is proven for: a static base fee (linear scheduler with zero periods), no dynamic fee, and fees collected in the quote token (6014).
+4. The fee is one the refund math is built and tested for: a static base fee (linear scheduler with zero periods), no dynamic fee, and fees collected in the quote token (6014). The current source also rejects a static fee above 1% (100 bps, fee numerator 10,000,000) with `FeeTooHigh` (6024).
 5. **v5:** the config follows the [Zero-PvP preset](#zero-pvp-preset-v5) (6023).
 6. `quote_mint` is the config's quote mint (6005).
 7. Default build only: the quote mint is in `QUOTE_CAPS` (6017), and the config's `migration_quote_threshold` is at most that mint's cap (6018).
 
-The preset check (step 5) runs before the caps (step 7), so a config that breaks both returns 6023 (`docs/security-review-v5.md`, A4). Treat 6013, 6014, 6017, 6018 and 6023 alike as "config not allowed".
+The preset check (step 5) runs before the caps (step 7), so a config that breaks both returns 6023 ([Router v5 review](../security/router-v5-review.md), A4). Treat 6013, 6014, 6017, 6018, 6023 and 6024 alike as "config not allowed".
 
 ### Swap accounts (buy and sell)
 
-`buy` and `sell` share one account list, the `Swap` struct in `zpvp_router/src/lib.rs`. The SDK builds it in `routerSwapInstruction` (`sdk/src/instructions.ts`).
+`buy` and `sell` share one account list, the `Swap` struct in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs). The SDK builds it in `routerSwapInstruction` ([src/instructions.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/instructions.ts)).
 
 | # | Account | W | S | Notes |
 |---|---|---|---|---|
@@ -164,7 +164,7 @@ Buys on the DBC curve through the router and records the cost basis.
 
 Accounts: [Swap accounts](#swap-accounts-buy-and-sell), plus the optional referral account.
 
-What it does (`buy` in `zpvp_router/src/lib.rs`):
+What it does (`buy` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs)):
 
 1. Splits the remaining accounts into the three hook accounts and the optional referral (6003 on a wrong count or an invalid referral, see [Native Referral](#native-referral-v5)).
 2. Calls DBC `swap2_with_transfer_hook` in partial-fill mode with `amount_in` and `min_out`. Quote moves from `user_quote` and base tokens land in `user_base`.
@@ -177,7 +177,7 @@ The SDK's `buyInstructions` also creates the user's quote and base ATAs (idempot
 
 ### Native Referral (v5)
 
-A buy may pass a referrer's quote token account as the 4th remaining account. The router hands it to DBC as `referral_token_account`, and DBC pays the referral cut out of its **protocol** fee. The buyer's spend, basis and later refund are the same with or without a referrer (`docs/trucee-plan.md` section 4; `litesvm-diff/src/zpvp_referral.ts`, summarized in `docs/security-review-v5.md` A1).
+A buy may pass a referrer's quote token account as the 4th remaining account. The router hands it to DBC as `referral_token_account`, and DBC pays the referral cut out of its **protocol** fee. The buyer's spend, basis and later refund are the same with or without a referrer ( [src/zpvp_referral.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_referral.ts), summarized in [Router v5 review](../security/router-v5-review.md) A1).
 
 The router returns 6003 `BadHookAccounts` unless the referral account (`dbc::check_referral`):
 
@@ -186,7 +186,7 @@ The router returns 6003 `BadHookAccounts` unless the referral account (`dbc::che
 * is an initialized token account of the quote mint;
 * is neither the pool's quote vault nor the market's buffer vault.
 
-The router allows a self-referral (`docs/security-review-v5.md`, A1). The SDK ignores a `referrer` equal to the buyer (`optionalReferrer` in `sdk/src/instructions.ts`).
+The router allows a self-referral ([Router v5 review](../security/router-v5-review.md), A1). The SDK ignores a `referrer` equal to the buyer (`optionalReferrer` in [src/instructions.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/instructions.ts)).
 
 ### sell
 
@@ -206,7 +206,7 @@ What it does (`sell` and `exit_at_cost`):
 4. Subtracts `basis_part` from `market.total_basis` and `position.basis`, and `tokens` from `position.tokens`. An exit that empties the position also clears its Auto-Exit deadline.
 5. Emits `SellEvent`.
 
-The refund depends only on the basis and the fee, not on the swap output, so `sell` takes no minimum-output argument. A position emptied by `sell` stays open. After the curve completes, DBC rejects the swap, so `sell` fails: "after graduation: selling into the curve is rejected (PoolIsCompleted)" in `litesvm-diff/src/zpvp_e2e.ts`.
+The refund depends only on the basis and the fee, not on the swap output, so `sell` takes no minimum-output argument. A position emptied by `sell` stays open. After the curve completes, DBC rejects the swap, so `sell` fails: "after graduation: selling into the curve is rejected (PoolIsCompleted)" in [src/zpvp_e2e.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_e2e.ts).
 
 The SDK's `sellInstructions` creates the user's quote ATA first (idempotent) and, with `unwrapSol`, closes it after the sell to unwrap wSOL.
 
@@ -276,7 +276,7 @@ Remaining accounts: exactly the three hook accounts, in the order shown for [Swa
 
 Checks, in order: the position holds tokens (6007), the deadline is set and has passed (`deadline ≠ 0` and `now ≥ deadline`, else 6020), and the curve is not complete (6021). It then runs the same exit at cost as `sell` for all of `position.tokens`, with the market PDA as DBC's payer. That clears the deadline. Emits `SellEvent`, then `AutoExitEvent`.
 
-A delegate approval below `position.tokens`, or a revoked one, makes Token-2022 reject the swap and nothing moves (`docs/security-review-v5.md`, A3).
+A delegate approval below `position.tokens`, or a revoked one, makes Token-2022 reject the swap and nothing moves ([Router v5 review](../security/router-v5-review.md), A3).
 
 ## Hook instructions
 
@@ -302,11 +302,11 @@ A delegate approval below `position.tokens`, or a revoked one, makes Token-2022 
 
 * **The rule.** `transfer_hook` loads the currently executing top-level instruction from the instructions sysvar (`get_instruction_relative(0, …)`). It requires that instruction's program to be the router; otherwise it fails with `TransferNotViaRouter` (hook error 6000). It does not read the amount, source, destination or owner.
 * **What passes.** A transfer inside a router instruction (router → DBC → Token-2022 → hook) passes, including the `auto_exit` sale that the market PDA signs as delegate.
-* **What fails.** A direct DBC swap, a wallet-to-wallet transfer, an aggregator route, and a transfer placed as a separate top-level instruction next to a router buy all fail (`litesvm-diff/src/zpvp_e2e.ts`, `zpvp_negative.ts`; see [Security → Invariants](../security.md#invariants)).
-* **Graduation.** DBC revokes the hook in the swap that completes the curve, after which the token is a plain Token-2022 token (`zpvp_hook/src/lib.rs` module doc; `zpvp_e2e.ts` checks "DBC revoked the transfer hook at graduation" and "after graduation: plain wallet transfer works (token is free)").
+* **What fails.** A direct DBC swap, a wallet-to-wallet transfer, an aggregator route, and a transfer placed as a separate top-level instruction next to a router buy all fail ([src/zpvp_e2e.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_e2e.ts), [src/zpvp_negative.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_negative.ts); see [Security → Invariants](../security.md#invariants)).
+* **Graduation.** DBC revokes the hook in the swap that completes the curve, after which the token is a plain Token-2022 token ([programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs) module doc; [src/zpvp_e2e.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_e2e.ts) checks "DBC revoked the transfer hook at graduation" and "after graduation: plain wallet transfer works (token is free)").
 * **Extra accounts.** The extra-account list holds one static account, the instructions sysvar. So every transfer of the base mint needs three extra accounts: the extra-account-metas PDA, the instructions sysvar and the hook program. The router passes these three to DBC as remaining accounts.
 
-Extra-account-metas layout (51 bytes, `EXTRA_ACCOUNT_METAS_LEN` and `initialize_extra_account_meta_list` in `zpvp_hook/src/lib.rs`):
+Extra-account-metas layout (51 bytes, `EXTRA_ACCOUNT_METAS_LEN` and `initialize_extra_account_meta_list` in [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs)):
 
 | Offset | Size | Content |
 |---|---|---|
@@ -328,11 +328,11 @@ Extra-account-metas layout (51 bytes, `EXTRA_ACCOUNT_METAS_LEN` and `initialize_
 | `sell` | `tokens` | 0 | 0, exact in | `user_base` → `buffer_vault` | `user` |
 | `auto_exit` | `position.tokens` | 0 | 0, exact in | `owner_base` → `buffer_vault` | market PDA, signed with the market seeds |
 
-DBC's referral account is at index 12 of the swap accounts. Without a referral, the router passes the DBC program ID there, which DBC's Anchor code reads as "no referral". With one, it passes the referral account as writable (test `swap2_passes_the_referral_writable_in_place_of_the_none_placeholder` in `dbc.rs`).
+DBC's referral account is at index 12 of the swap accounts. Without a referral, the router passes the DBC program ID there, which DBC's Anchor code reads as "no referral". With one, it passes the referral account as writable (test `swap2_passes_the_referral_writable_in_place_of_the_none_placeholder` in [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs)).
 
 ### DBC fields the router reads
 
-All offsets are byte offsets from the start of the account data, discriminator included (`zpvp_router/src/dbc.rs`, `preset.rs`).
+All offsets are byte offsets from the start of the account data, discriminator included ([programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs), [programs/zpvp_router/src/preset.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/preset.rs)).
 
 | Account | Offset | Field | Used for |
 |---|---|---|---|
@@ -352,7 +352,7 @@ All offsets are byte offsets from the start of the account data, discriminator i
 
 ### Zero-PvP preset (v5)
 
-`init_market` rejects a config with 6023 `PresetNotAllowed` unless every rule below holds (`preset::is_zero_pvp_preset`). Each field is `u8` unless noted. Offsets are checked against real DBC-written config bytes in the `preset.rs` unit tests and against the DBC SDK 1.5.13 IDL (`docs/security-review-v5.md`, "Verified DBC fields").
+`init_market` rejects a config with 6023 `PresetNotAllowed` unless every rule below holds (`preset::is_zero_pvp_preset`). Each field is `u8` unless noted. Offsets are checked against real DBC-written config bytes in the [programs/zpvp_router/src/preset.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/preset.rs) unit tests and against the DBC SDK 1.5.13 IDL ([Router v5 review](../security/router-v5-review.md), "Verified DBC fields").
 
 | Offset | DBC field | Rule | What it rules out |
 |---|---|---|---|
@@ -367,13 +367,13 @@ All offsets are byte offsets from the start of the account data, discriminator i
 | 233 | `migration_option` | `== 1` (DAMM v2) | Any other migration target |
 | 246 | `token_update_authority` | `== 1` (Immutable) | A creator or partner who keeps the mint authority (options 3, 4) or the metadata authority (options 0, 2) |
 
-The 6023 message still reads "(creator allocation, fixed supply or unlocked LP)", but it covers every rule above (`docs/security-review-v5.md`, A6). DBC never rewrites a config after it is created, so the router checks the preset only once, in `init_market`. Markets opened by the pre-v5 router were not checked against it (`docs/security-review-v5.md`, "Config immutability" and follow-up ONC-09).
+The 6023 message still reads "(creator allocation, fixed supply or unlocked LP)", but it covers every rule above ([Router v5 review](../security/router-v5-review.md), A6). DBC never rewrites a config after it is created, so the router checks the preset only once, in `init_market`. Markets opened by the pre-v5 router were not checked against it ([Router v5 review](../security/router-v5-review.md), "Config immutability" and devnet configuration follow-up).
 
 ## Events
 
-The router emits Anchor events with `emit!`. Each one is logged as a `Program data: <base64>` line. The payload is the 8-byte discriminator `sha256("event:<Name>")[..8]`, followed by the fields in Borsh encoding (little-endian, no padding). Every event starts with `market` (`docs/security-review-v5.md`, item 9).
+The router emits Anchor events with `emit!`. Each one is logged as a `Program data: <base64>` line. The payload is the 8-byte discriminator `sha256("event:<Name>")[..8]`, followed by the fields in Borsh encoding (little-endian, no padding). Every event starts with `market` ([Router v5 review](../security/router-v5-review.md), item 9).
 
-`parseRouterEvents(logs)` in `sdk/src/events.ts` decodes them in log order. It reads only `Program data:` lines logged while the router is the innermost program, so data logged by DBC, Token-2022 or the hook is never mistaken for a router event. It skips unknown discriminators and payloads of the wrong length.
+`parseRouterEvents(logs)` in [src/events.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/events.ts) decodes them in log order. It reads only `Program data:` lines logged while the router is the innermost program, so data logged by DBC, Token-2022 or the hook is never mistaken for a router event. It skips unknown discriminators and payloads of the wrong length.
 
 | Event | Emitted by | Discriminator | Size (bytes) |
 |---|---|---|---|
@@ -440,7 +440,7 @@ The router emits Anchor events with `emit!`. Each one is logged as a `Program da
 | 40 | `user` | Pubkey | Position owner |
 | 72 | `cranker` | Pubkey | Signer who ran `auto_exit` |
 
-Sources: the `#[event]` structs and `emit!` calls in `zpvp_router/src/lib.rs`, and `EVENT_DISCRIMINATORS` and `EVENT_LAYOUTS` in `sdk/src/events.ts`.
+Sources: the `#[event]` structs and `emit!` calls in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs), and `EVENT_DISCRIMINATORS` and `EVENT_LAYOUTS` in [src/events.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/events.ts).
 
 ## Account layouts
 
@@ -478,16 +478,16 @@ Both accounts are Anchor accounts: an 8-byte discriminator, `sha256("account:<Na
 | 88 | 1 | `bump` | u8 | Position PDA bump |
 | 89 | 8 | `auto_exit_deadline` | i64 | **v5.** Unix time from which `auto_exit` may run, 0 = disabled. Cleared when an exit empties the position |
 
-* **Pinned by tests.** The Market offsets are asserted on serialized bytes by `invariant_tests::market_raw_bytes_keep_the_offsets_tests_and_clients_read`. The Position offsets are asserted by `tests::position_layout_appends_auto_exit_deadline` in `lib.rs`. The SDK reads the same offsets (`MARKET_OFFSETS` and `POSITION_OFFSETS` in `sdk/src/accounts.ts`).
+* **Pinned by tests.** The Market offsets are asserted on serialized bytes by `invariant_tests::market_raw_bytes_keep_the_offsets_tests_and_clients_read`. The Position offsets are asserted by `tests::position_layout_appends_auto_exit_deadline` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs). The SDK reads the same offsets (`MARKET_OFFSETS` and `POSITION_OFFSETS` in [src/accounts.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/accounts.ts)).
 * **Older accounts.** Positions written by the pre-v5 router (the devnet build before the v5 upgrade) are 89 bytes, without `auto_exit_deadline`, and the devnet router also still owns 241-byte Markets from an earlier build. The SDK's `decodePosition` accepts both Position sizes and returns `autoExitDeadline: null` for the shorter one.
-* **Growth.** New fields go at the end (`docs/trucee-plan.md`, "Invariants for any refactor"). The SDK decoders accept longer data.
-* **Queries.** `fetchAllMarkets` filters program accounts on the Market discriminator at offset 0 and on the supported Market sizes, one scan per size, so the 241-byte legacy Markets are skipped. `fetchPositionsByOwner` filters on the Position discriminator, on `owner` at offset 8 and on the 97-byte size, so it skips 89-byte pre-v5 positions. To list one market's positions, filter on the discriminator and on `market` at offset 40 (`sdk/src/accounts.ts`).
+* **Growth.** New fields go at the end. The SDK decoders accept longer data.
+* **Queries.** `fetchAllMarkets` filters program accounts on the Market discriminator at offset 0 and on the supported Market sizes, one scan per size, so the 241-byte legacy Markets are skipped. `fetchPositionsByOwner` filters on the Position discriminator, on `owner` at offset 8 and on the 97-byte size, so it skips 89-byte pre-v5 positions. To list one market's positions, filter on the discriminator and on `market` at offset 40 ([src/accounts.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/accounts.ts)).
 
 ## Error codes
 
-### Router errors (`RouterError`, 6000–6023)
+### Router errors (`RouterError`, 6000–6024)
 
-Messages are verbatim from `#[msg]` in `zpvp_router/src/lib.rs` and match `ROUTER_ERRORS` in `sdk/src/errors.ts`. New variants are only ever appended. The order is pinned by `invariant_tests::error_codes_6000_to_6023_keep_their_order`.
+Messages are verbatim from `#[msg]` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) and match `ROUTER_ERRORS` in [src/errors.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/errors.ts). New variants are only ever appended. The reviewed 6000–6023 order is pinned by `invariant_tests::error_codes_6000_to_6023_keep_their_order`; the fee-cap error is appended as 6024.
 
 | Code | Hex | Name | Message | Raised by |
 |---|---|---|---|---|
@@ -515,6 +515,7 @@ Messages are verbatim from `#[msg]` in `zpvp_router/src/lib.rs` and match `ROUTE
 | 6021 | `0x1785` | `AutoExitCurveComplete` | `Curve is complete: auto-exit is no longer possible` | `auto_exit` (v5) |
 | 6022 | `0x1786` | `PositionCapExceeded` | `Buy would exceed the anti-whale cap (20% of curve supply)` | `buy` (v5) |
 | 6023 | `0x1787` | `PresetNotAllowed` | `Config breaks the Zero-PvP preset (creator allocation, fixed supply or unlocked LP)` | `init_market` (v5) |
+| 6024 | `0x1788` | `FeeTooHigh` | `Config fee is above the 1% cap` | `init_market` (current source) |
 
 ### Hook errors (`HookError`)
 
@@ -525,43 +526,44 @@ Messages are verbatim from `#[msg]` in `zpvp_router/src/lib.rs` and match `ROUTE
 ### Telling errors apart
 
 * The router and the hook both number their errors from 6000, so the failing program decides what a code means. Solana logs the innermost failing program first: `Program <id> failed: custom program error: 0x…`. A hook rejection inside a DBC swap therefore shows up under the hook's ID first.
-* Codes 2000–3999 are Anchor framework errors from account constraints. For example, the v5 tests see 2006 `ConstraintSeeds` for a position of another wallet, 2009 `ConstraintAssociated` for a non-ATA quote account, 2015 `ConstraintTokenOwner` for another wallet's token account, 3010 `AccountNotSigner` and 3012 `AccountNotInitialized` (`docs/security-review-v5.md`, checklist evidence).
-* `decodeTxError(err)` in `sdk/src/errors.ts` maps a failed transaction or its logs to `{ program, code, name, message }`. It knows the router, hook, DBC and Anchor tables and detects wallet rejections.
+* Codes 2000–3999 are Anchor framework errors from account constraints. For example, the v5 tests see 2006 `ConstraintSeeds` for a position of another wallet, 2009 `ConstraintAssociated` for a non-ATA quote account, 2015 `ConstraintTokenOwner` for another wallet's token account, 3010 `AccountNotSigner` and 3012 `AccountNotInitialized` ([Router v5 review](../security/router-v5-review.md), checklist evidence).
+* `decodeTxError(err)` in [src/errors.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/errors.ts) maps a failed transaction or its logs to `{ program, code, name, message }`. It knows the router, hook, DBC and Anchor tables and detects wallet rejections.
 
 ## Constants and formulas
 
 | Item | Value or formula | Source |
 |---|---|---|
-| Anti-Whale cap (v5) | ⌊`swap_base_amount` × 2,000 ÷ 10,000⌋, computed in `u128` (`ANTI_WHALE_BPS` = 2000). On devnet config `HbcvzZMWkg3rFHNwsDujFJXazXoWhcWt4dthbJGAaGhs`, `swap_base_amount` 185,067,869,081,122 gives a cap of 37,013,573,816,224 | `lib.rs` `anti_whale_cap` and test `anti_whale_cap_is_20_percent_of_swap_base_amount_floored`; `dbc.rs` test constant `DEVNET_SWAP_BASE_AMOUNT` |
-| Fee denominator | 1,000,000,000 | `math.rs` `FEE_DENOMINATOR` |
-| Basis withheld per buy | 16 raw quote units | `math.rs` `DUST_PER_BUY` |
-| Haircut per exit | 2 raw quote units | `math.rs` `HAIRCUT_PER_EXIT` |
-| Basis of a buy | max(`net_into_curve` − 16, 0) | `math.rs` `basis_for_buy` |
-| Basis of an exit | Full exit: the whole basis. Partial exit: ⌊`basis` × `tokens` ÷ `position.tokens`⌋ | `math.rs` `basis_for_exit`; SDK `basisForExit` |
-| Refund | max(`basis_part` − ⌈`basis_part` × `fee_numerator` ÷ 1,000,000,000⌉ − 2, 0) | `math.rs` `refund_for`; SDK `refundFor` |
-| Example refund | `basis_part` 1,000,000,000 at `fee_numerator` 10,000,000 (1%) refunds 989,999,998 | `math.rs` test `refund_matches_python_reference` |
-| Surplus share | ⌊`surplus_snapshot` × `basis` ÷ `basis_snapshot`⌋, 0 when `basis_snapshot` is 0 | `math.rs` `surplus_share` |
-| Hook accounts per DBC swap | 3 | `dbc.rs` `HOOK_ACCOUNT_COUNT` |
+| Anti-Whale cap (v5) | ⌊`swap_base_amount` × 2,000 ÷ 10,000⌋, computed in `u128` (`ANTI_WHALE_BPS` = 2000). On devnet config `HbcvzZMWkg3rFHNwsDujFJXazXoWhcWt4dthbJGAaGhs`, `swap_base_amount` 185,067,869,081,122 gives a cap of 37,013,573,816,224 | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) `anti_whale_cap` and test `anti_whale_cap_is_20_percent_of_swap_base_amount_floored`; [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs) test constant `DEVNET_SWAP_BASE_AMOUNT` |
+| Maximum static fee (current source) | 1% = 100 bps = fee numerator 10,000,000; higher configs fail with 6024 at `init_market` | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`init_market`, `RouterError`) |
+| Fee denominator | 1,000,000,000 | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) `FEE_DENOMINATOR` |
+| Basis withheld per buy | 16 raw quote units | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) `DUST_PER_BUY` |
+| Haircut per exit | 2 raw quote units | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) `HAIRCUT_PER_EXIT` |
+| Basis of a buy | max(`net_into_curve` − 16, 0) | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) `basis_for_buy` |
+| Basis of an exit | Full exit: the whole basis. Partial exit: ⌊`basis` × `tokens` ÷ `position.tokens`⌋ | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) `basis_for_exit`; SDK `basisForExit` |
+| Refund | max(`basis_part` − ⌈`basis_part` × `fee_numerator` ÷ 1,000,000,000⌉ − 2, 0) | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) `refund_for`; SDK `refundFor` |
+| Example refund | `basis_part` 1,000,000,000 at `fee_numerator` 10,000,000 (1%) refunds 989,999,998 | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) test `refund_matches_python_reference` |
+| Surplus share | ⌊`surplus_snapshot` × `basis` ÷ `basis_snapshot`⌋, 0 when `basis_snapshot` is 0 | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) `surplus_share` |
+| Hook accounts per DBC swap | 3 | [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs) `HOOK_ACCOUNT_COUNT` |
 
 ## Sources
 
-All program paths are under `zpvp/programs/`. The router's unit tests, which pin the layouts, the error order, the preset, the referral rules and the math, were re-run for this page: `cd zpvp && CARGO_BUILD_JOBS=4 cargo test -p zpvp_router` gave **48 passed, 0 failed** on commit `ba6dcb1` (2026-10-11).
+Program links point into the published programs repository. The router's unit tests, which pin the layouts, the error order, the preset, the referral rules and the math, were re-run for this page: `cd zpvp && CARGO_BUILD_JOBS=4 cargo test -p zpvp_router` gave **48 passed, 0 failed** on commit `ba6dcb1` (2026-10-11).
 
 | Claim | Source |
 |---|---|
-| Program IDs | `declare_id!` in `zpvp_router/src/lib.rs` and `zpvp_hook/src/lib.rs`; `DBC_PROGRAM_ID` in `zpvp_router/src/dbc.rs`; `sdk/src/constants.ts` |
-| Devnet runs router v5: the capped build of `3985d1f`, sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5`, 439,104 bytes, last deployed in slot 509900704 | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet`; deploy transaction `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r` (ONC-09, commit `125061c`); `docs/mainnet-deploy.md` (Pinned build); [Security](../security.md) (Upgrade authority) |
-| The router source on `main` equals the pinned v5 build; mainnet release sha256 for both programs | `git rev-parse HEAD:zpvp` (`9c1e85a…`, the tree at `3985d1f`); `docs/mainnet-deploy.md` (Pinned build) |
-| SDK scans: Market sizes, the 97-byte Position size, legacy accounts skipped | `fetchAllMarkets`, `fetchPositionsByOwner` and the file header in `sdk/src/accounts.ts` |
-| Mainnet deploy step HS-3 | `docs/aziz-handoff.md` |
-| Quote mints and caps | `QUOTE_CAPS` in `zpvp_router/src/lib.rs`; decimals, token programs and clusters in `sdk/src/constants.ts` |
-| Instructions, arguments, account order and checks | `#[program]` and the `#[derive(Accounts)]` structs in `zpvp_router/src/lib.rs`; `zpvp_router/src/dbc.rs`; `zpvp_hook/src/lib.rs`; builders in `sdk/src/instructions.ts` |
-| Instruction, account and event discriminators | `sha256("global:<name>")`, `sha256("account:<Name>")` and `sha256("event:<Name>")`, truncated to 8 bytes; recomputed for this page and equal to the constants in `sdk/src/instructions.ts`, `sdk/src/accounts.ts` and `sdk/src/events.ts` |
-| Native Referral rules | `split_buy_remaining`, `check_referral` and their tests in `zpvp_router/src/dbc.rs`; `docs/trucee-plan.md` section 4; `docs/security-review-v5.md` A1 |
-| Preset rules and offsets | `zpvp_router/src/preset.rs` and its tests; `docs/security-review-v5.md` (F1–F3, "Verified DBC fields") |
-| Market layout, 274 bytes | `Market` in `zpvp_router/src/lib.rs`; `invariant_tests::market_raw_bytes_keep_the_offsets_tests_and_clients_read` |
-| Position layout, 97 bytes | `Position` in `zpvp_router/src/lib.rs`; `tests::position_layout_appends_auto_exit_deadline`; 89-byte pre-v5 size in `sdk/src/constants.ts` (`POSITION_ACCOUNT_SIZE_V1`) |
-| Events | `#[event]` structs in `zpvp_router/src/lib.rs`; `sdk/src/events.ts` |
-| Error codes and messages | `RouterError` and `HookError` in the two `lib.rs` files; `invariant_tests::error_codes_6000_to_6023_keep_their_order`; `sdk/src/errors.ts` |
-| Hook rule and graduation | `transfer_hook` and the module doc in `zpvp_hook/src/lib.rs`; `litesvm-diff/src/zpvp_e2e.ts` |
-| Constants and formulas | `zpvp_router/src/math.rs` and `lib.rs`, with their unit tests |
+| Program IDs | `declare_id!` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) and [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs); `DBC_PROGRAM_ID` in [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs); [src/constants.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/constants.ts) |
+| Devnet runs router v5: the capped build of `3985d1f`, sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5`, 439,104 bytes, last deployed in slot 509900704 | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet`; deploy transaction `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r` (commit `125061c`); [Security → Upgrade authority](../security.md#upgrade-authority) |
+| Historical pinned v5 artifact hashes; current source additionally caps static fees at 1% | [Security → Upgrade authority](../security.md#upgrade-authority) and [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`init_market`, `RouterError`) |
+| SDK scans: Market sizes, the 97-byte Position size, legacy accounts skipped | `fetchAllMarkets`, `fetchPositionsByOwner` and the file header in [src/accounts.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/accounts.ts) |
+| Mainnet deployment remains pending; program IDs are intended to match devnet | [Program IDs](#program-ids) |
+| Quote mints and caps | `QUOTE_CAPS` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs); decimals, token programs and clusters in [src/constants.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/constants.ts) |
+| Instructions, arguments, account order and checks | `#[program]` and the `#[derive(Accounts)]` structs in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs); [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs); [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs); builders in [src/instructions.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/instructions.ts) |
+| Instruction, account and event discriminators | `sha256("global:<name>")`, `sha256("account:<Name>")` and `sha256("event:<Name>")`, truncated to 8 bytes; recomputed for this page and equal to the constants in [src/instructions.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/instructions.ts), [src/accounts.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/accounts.ts) and [src/events.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/events.ts) |
+| Native Referral rules | `split_buy_remaining`, `check_referral` and their tests in [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs); [Router v5 review](../security/router-v5-review.md) A1 |
+| Preset rules and offsets | [programs/zpvp_router/src/preset.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/preset.rs) and its tests; [Router v5 review](../security/router-v5-review.md) (F1–F3, "Verified DBC fields") |
+| Market layout, 274 bytes | `Market` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs); `invariant_tests::market_raw_bytes_keep_the_offsets_tests_and_clients_read` |
+| Position layout, 97 bytes | `Position` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs); `tests::position_layout_appends_auto_exit_deadline`; 89-byte pre-v5 size in [src/constants.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/constants.ts) (`POSITION_ACCOUNT_SIZE_V1`) |
+| Events | `#[event]` structs in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs); [src/events.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/events.ts) |
+| Error codes and messages | `RouterError` and `HookError` in the two [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) files; `invariant_tests::error_codes_6000_to_6023_keep_their_order`; [src/errors.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/errors.ts) |
+| Hook rule and graduation | `transfer_hook` and the module doc in [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs); [src/zpvp_e2e.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_e2e.ts) |
+| Constants and formulas | [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) and [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs), with their unit tests |

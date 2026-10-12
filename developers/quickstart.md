@@ -16,23 +16,23 @@ This page walks through one TypeScript file that uses `@trucee/sdk` on Solana de
 
 It reads accounts and builds and signs transactions in memory. It never sends a transaction and reads no secret key: the signer is a keypair it generates on the spot.
 
-The file is `gitbook/examples/quickstart.ts` in the Trucee source, and this page embeds it verbatim. It typechecks against the SDK's public API with `cd sdk && npm ci && cd ../gitbook/examples && npm ci && npx tsc --noEmit`.
+The file is [examples/quickstart.ts](https://github.com/trucee-fun/trucee-docs/blob/main/examples/quickstart.ts), and this page embeds it verbatim. It typechecks against the SDK's public API with `cd sdk && npm ci && cd ../gitbook/examples && npm ci && npx tsc --noEmit`.
 
 {% hint style="warning" %}
-**Status:** the Trucee programs run on Solana devnet only. They are unaudited and not deployed to mainnet. `@trucee/sdk` is not published to the npm registry and the source repository is not public yet (see [Links](../links.md)), so for now you install the SDK from a checkout of the source.
+**Status:** the Trucee programs run on Solana devnet only. They are not independently reviewed and not deployed to mainnet. `@trucee/sdk` is not published to the npm registry and the source repository is not public yet (see [Links](../links.md)), so for now you install the SDK from a checkout of the source.
 {% endhint %}
 
 {% hint style="info" %}
-**What works today.** Every SDK call in the example is implemented, and the SDK's public API is pinned by its contract test (`sdk/test/contract.test.ts`).
+**What works today.** Every SDK call in the example is implemented, and the SDK's public API is pinned by its contract test ([test/contract.test.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/test/contract.test.ts)).
 
 The SDK also has Auto-Exit builders (`setAutoExitInstructions` and `autoExitInstruction`). Auto-Exit runs on devnet since the router v5 upgrade. This quickstart leaves it out to stay short; the [Programs reference](programs.md) documents both instructions.
 {% endhint %}
 
 ## Install
 
-You need a checkout of the Trucee source and Node.js 22.18 or later: the example runs the `.ts` file directly with Node's built-in type stripping, so it needs no TypeScript runner.
+Clone the repositories side by side using the [workspace layout](../README.md#source-repositories). You need Node.js 22.18 or later: the example runs the `.ts` file directly with Node's built-in type stripping, so it needs no TypeScript runner.
 
-From the root of the checkout, install the SDK's own dependencies first. `npm ci` in `sdk/` also builds the SDK's `dist/` folder (its `prepare` script), which is what your project imports.
+From the workspace folder that contains `sdk/` and `gitbook/`, install the SDK's own dependencies first. `npm ci` in `sdk/` also builds the SDK's `dist/` folder (its `prepare` script), which is what your project imports.
 
 ```bash
 cd sdk && npm ci && cd ..
@@ -52,13 +52,13 @@ The example's `.npmrc` sets `install-links=true`, so `npm ci` installs the SDK a
 
 ### In your own project
 
-Depend on the SDK folder and install its peer dependencies yourself, on the ranges in `sdk/package.json`:
+Depend on the SDK folder and install its peer dependencies yourself, on the ranges in [package.json](https://github.com/trucee-fun/trucee-sdk/blob/main/package.json):
 
 ```json
 {
   "type": "module",
   "dependencies": {
-    "@trucee/sdk": "file:../path/to/sdk",
+    "@trucee/sdk": "file:../sdk",
     "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.13",
     "@solana/spl-token": "^0.4.15",
     "@solana/web3.js": "^1.99.0",
@@ -330,11 +330,11 @@ try {
 * `tokensOut`: the tokens you receive;
 * `fee`: the trading fee, charged on the input;
 * `netIntoCurve`: the quote that enters the curve (`amountIn − fee` when the buy fills completely);
-* `basisAdded`: the cost basis the buy adds to your position. The router records the quote that entered the curve minus 16 base units (`DUST_PER_BUY`), which absorbs DBC's rounding (`zpvp/programs/zpvp_router/src/math.rs`).
+* `basisAdded`: the cost basis the buy adds to your position. The router records the quote that entered the curve minus 16 base units (`DUST_PER_BUY`), which absorbs DBC's rounding ([programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs)).
 
-On the buy that completes the curve, DBC takes only the input it needs, and `fee` and `netIntoCurve` cover just that part. Once the curve is complete `quoteBuy` throws, because buys are closed (`sdk/src/quote.ts`).
+On the buy that completes the curve, DBC takes only the input it needs, and `fee` and `netIntoCurve` cover just that part. Once the curve is complete `quoteBuy` throws, because buys are closed ([src/quote.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/quote.ts)).
 
-DBC rounds in the pool's favour, so `tokensOut` can be 1 raw unit above what the buy receives on-chain (the tolerance in `sdk/test/quote.test.ts`). The example takes that unit off before it applies its 1% slippage, so `minOut` always stays below the quote. It then calls `buyInstructions`, which returns, in order:
+DBC rounds in the pool's favour, so `tokensOut` can be 1 raw unit above what the buy receives on-chain (the tolerance in [test/quote.test.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/test/quote.test.ts)). The example takes that unit off before it applies its 1% slippage, so `minOut` always stays below the quote. It then calls `buyInstructions`, which returns, in order:
 
 1. the idempotent creation of your quote token account and of your Token-2022 base token account;
 2. for a SOL quote, a transfer of exactly `amountIn` lamports into your wSOL account and a `syncNative`;
@@ -350,7 +350,7 @@ DBC rounds in the pool's favour, so `tokensOut` can be 1 raw unit above what the
 
 `fetchPositionsByOwner(connection, owner)` returns a wallet's router `Position` accounts (one per market and owner) with `tokens` and `basis`.
 
-`quoteExit(position, market, tokens)` returns what an exit of `tokens` refunds. It throws a `RangeError` when `tokens` is 0 or above the position, the case where the router fails with `InvalidExitAmount`. Each field follows the router's refund rule in `zpvp/programs/zpvp_router/src/math.rs`:
+`quoteExit(position, market, tokens)` returns what an exit of `tokens` refunds. It throws a `RangeError` when `tokens` is 0 or above the position, the case where the router fails with `InvalidExitAmount`. Each field follows the router's refund rule in [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs):
 
 | Field | Router rule |
 | --- | --- |
@@ -358,7 +358,7 @@ DBC rounds in the pool's favour, so `tokensOut` can be 1 raw unit above what the
 | `feeAtCost` | `ceil(basisPart × feeNumerator / 1,000,000,000)`: the trading fee you would pay selling at cost. |
 | `refund` | `basisPart − feeAtCost − 2` (`HAIRCUT_PER_EXIT`), never below zero. |
 
-`floorValue(position, market)` is the `refund` for the whole position: what exiting everything at cost pays before graduation. For example, a cost basis of 1,000,000,000 lamports (1 SOL) at a 1% fee (`feeNumerator` 10,000,000) refunds 989,999,998 lamports (router unit test `refund_matches_python_reference` in `math.rs`).
+`floorValue(position, market)` is the `refund` for the whole position until graduation: what exiting everything at cost pays before graduation, after the fee at cost and 2-lamport haircut. For example, a cost basis of 1,000,000,000 lamports (1 SOL) at a 1% fee (`feeNumerator` 10,000,000) refunds 989,999,998 lamports (router unit test `refund_matches_python_reference` in [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs)).
 
 `sellInstructions` builds the router's `sell(tokens)`. The router sells the tokens into the curve, parks the proceeds in the market's buffer and pays `refund` from the buffer to your quote token account. With `unwrapSol: true` and a SOL quote it then closes your wSOL account, so the refund arrives as SOL. The position's owner must sign, so when you pass another wallet's address the example leaves the exit transaction unsigned.
 
@@ -370,7 +370,7 @@ DBC rounds in the pool's favour, so `tokensOut` can be 1 raw unit above what the
 2. create the DBC pool with the token's `name`, `symbol` and `uri` metadata (extra signer: the new base mint keypair);
 3. write the hook's extra-account list and open the router market, plus the creator's first buy when you pass `initialBuy` (it is then the pool's first possible trade).
 
-Every transaction already has the creator as fee payer and a recent blockhash, and fits in one packet. `signers[i]` are the extra signers of `transactions[i]`: the example adds them, then lets the creator sign. Metadata limits are 32 bytes for `name`, 10 for `symbol` and 200 for `uri` (`sdk/src/launch.ts`).
+Every transaction already has the creator as fee payer and a recent blockhash, and fits in one packet. `signers[i]` are the extra signers of `transactions[i]`: the example adds them, then lets the creator sign. Metadata limits are 32 bytes for `name`, 10 for `symbol` and 200 for `uri` ([src/launch.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/launch.ts)).
 
 The `preset` options describe the Zero-PvP DBC config:
 
@@ -378,7 +378,7 @@ The `preset` options describe the Zero-PvP DBC config:
 | --- | --- |
 | `quote` | A `QuoteMintInfo` from the cluster config (on devnet: SOL). |
 | `migrationQuoteThreshold` | The quote raised at which the curve graduates, in raw units. The router caps it per quote mint (`QUOTE_CAPS`): 10 SOL, 5 TSLAx or 10 NVDAx. The SDK throws above the cap. |
-| `feeBps` | The static trading fee in basis points: `feeNumerator = feeBps × 100,000`, so 100 bps is 10,000,000 (1%). |
+| `feeBps` | The static trading fee in basis points, at most 100 bps (1%): `feeNumerator = feeBps × 100,000`, so 100 bps is 10,000,000 (1%). |
 | `feeClaimer`, `leftoverReceiver` | The DBC config's fee claimer and leftover receiver. Both must be wallet addresses; the SDK rejects a PDA. |
 | `totalTokenSupply` | Optional, in raw units of the 6-decimal base token. Default: 1,000,000,000 tokens. |
 | `percentageSupplyOnMigration` | Optional. Default: 20% of the supply. |
@@ -388,7 +388,7 @@ The preset gives the creator no token allocation (no locked vesting), migrates t
 The router only opens a market for a config that:
 
 * uses the Trucee transfer hook (error 6013 `WrongTransferHook`);
-* charges a static fee collected in the quote token, with no fee scheduler, rate limiter or dynamic fee (error 6014 `UnsupportedFeeConfig`);
+* charges a static fee collected in the quote token, with no fee scheduler, rate limiter or dynamic fee (error 6014 `UnsupportedFeeConfig`); the current source also caps that fee at 1% (error 6024 `FeeTooHigh`);
 * follows the Zero-PvP preset: no creator allocation, dynamic supply, all LP permanently locked with no LP vesting, DAMM v2 migration with no migration fee, and an immutable token authority, so nobody keeps the mint authority (error 6023 `PresetNotAllowed`);
 * uses an allowlisted quote mint (error 6017 `QuoteMintNotAllowed`) with a threshold at or below its cap (error 6018 `ThresholdTooHigh`).
 
@@ -398,7 +398,7 @@ The router only opens a market for a config that:
 
 ### Sign
 
-`SignTransaction` has the same shape as a wallet adapter's `signTransaction`. The example signs with `keypairSigner`, a local keypair; in a browser app you pass `useWallet().signTransaction` from the Solana wallet adapter instead. The example stops there. To go live, send the signed transactions with your usual `@solana/web3.js` flow, the launch transactions in the order of the plan.
+`SignTransaction` has the same shape as a wallet adapter's `signTransaction`. The example signs with `keypairSigner`, a local keypair; in a browser app you pass `useWallet.signTransaction` from the Solana wallet adapter instead. The example stops there. To go live, send the signed transactions with your usual `@solana/web3.js` flow, the launch transactions in the order of the plan.
 
 ## Errors
 
@@ -413,8 +413,9 @@ The router only opens a market for a config that:
 | router | 6017 | `QuoteMintNotAllowed` | Mainnet beta: quote mint is not on the allowlist |
 | router | 6018 | `ThresholdTooHigh` | Mainnet beta: migration quote threshold above the cap |
 | router | 6022 | `PositionCapExceeded` | Buy would exceed the anti-whale cap (20% of curve supply) |
+| router | 6024 | `FeeTooHigh` | Config fee is above the 1% cap |
 
-The full tables are `ROUTER_ERRORS` and `HOOK_ERRORS` in `sdk/src/errors.ts`.
+The full tables are `ROUTER_ERRORS` and `HOOK_ERRORS` in [src/errors.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/errors.ts).
 
 {% hint style="info" %}
 `PositionCapExceeded` comes from the Anti-Whale cap, which runs on devnet since the router v5 upgrade. A buy that would leave your position above 20% of the curve's sale supply fails with it.

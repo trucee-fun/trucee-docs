@@ -13,6 +13,7 @@
 ## Trust
 
 * [Security](security.md)
+  * [Router v5 security review](security/router-v5-review.md)
 * [Research & data](research-and-data.md)
 
 ## More
