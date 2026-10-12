@@ -19,7 +19,7 @@ It reads accounts and builds and signs transactions in memory. It never sends a 
 The file is [examples/quickstart.ts](https://github.com/trucee-fun/trucee-docs/blob/main/examples/quickstart.ts), and this page embeds it verbatim. It typechecks against the SDK's public API with `cd sdk && npm ci && cd ../gitbook/examples && npm ci && npx tsc --noEmit`.
 
 {% hint style="warning" %}
-**Status:** the Trucee programs run on Solana mainnet (since 2026-10-12) and devnet, with the same program IDs. They are not independently reviewed. `@trucee/sdk` is not published to the npm registry and the source repository is not public yet (see [Links](../links.md)), so for now you install the SDK from a checkout of the source.
+**Status:** the Trucee programs run on Solana mainnet (since 2026-10-12) and devnet, with the same program IDs. They are not independently reviewed. The SDK source is public at [trucee-fun/trucee-sdk](https://github.com/trucee-fun/trucee-sdk). `@trucee/sdk` is not on the npm registry yet, so for now you install it from a checkout of that repository (see [Links](../links.md)).
 {% endhint %}
 
 {% hint style="info" %}

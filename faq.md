@@ -184,7 +184,7 @@ The wallet does not have to handle the hook itself. Every buy and exit already c
 
 **Pending: the hands-on check.** The Trucee team will try a buy and an exit at cost by hand with each of Phantom, Solflare and Backpack on devnet. That check has to run from a hosted HTTPS site, because Phantom does not add its guard instructions on `localhost`. It will also show how each wallet's preview labels a new Token-2022 token, and whether Phantom shows its warning for a domain it has not reviewed yet. This answer will list the results once the check is done.
 
-Buys and exits go through the Trucee router, which the Trucee app and SDK call for you. The app is at [trucee.fun](https://trucee.fun) on mainnet and [devnet.trucee.fun](https://devnet.trucee.fun) on devnet. The SDK is not public yet (see [Links](links.md)). After graduation, the token works like any other Token-2022 token.
+Buys and exits go through the Trucee router, which the Trucee app and SDK call for you. The app is at [trucee.fun](https://trucee.fun) on mainnet and [devnet.trucee.fun](https://devnet.trucee.fun) on devnet. The SDK is open source at [trucee-fun/trucee-sdk](https://github.com/trucee-fun/trucee-sdk) (see [Links](links.md)). After graduation, the token works like any other Token-2022 token.
 
 *Source:; [src/rsc01_injected_ixs.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/rsc01_injected_ixs.ts); [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs) (`transfer_hook` reads `get_instruction_relative(0)`); [src/instructions.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/instructions.ts) (`routerSwapInstruction`).*
 

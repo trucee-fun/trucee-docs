@@ -18,7 +18,7 @@ The SDK exports the same addresses as `ROUTER_PROGRAM_ID`, `HOOK_PROGRAM_ID` and
 
 | Resource | Link |
 | --- | --- |
-| Source code (GitHub) | Not yet public |
+| Source code (GitHub) | [trucee-fun/trucee](https://github.com/trucee-fun/trucee): the overview, with the public SDK, simulator, LiteSVM harness, crank and docs repositories. The programs and the web app are private for now. |
 | Web app | [trucee.fun](https://trucee.fun) (mainnet), [devnet.trucee.fun](https://devnet.trucee.fun) (devnet) |
 | First mainnet market | [Trucee Cat (TCAT)](https://trucee.fun/t/EFRXppU9U9pniwDVCD1kaosNQV3HzhKqY7XrcuMvFmC2), see [For traders → Proof on mainnet](traders.md#proof-on-mainnet) |
 | X | [@truceefun](https://x.com/truceefun) |
