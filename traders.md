@@ -230,6 +230,23 @@ Above the table, one total per quote token adds up the floors of your live posit
 
 [Programs reference → Error codes](developers/programs.md#error-codes) lists every router and hook error.
 
+## Proof on mainnet
+
+The first mainnet market is **Trucee Cat (TCAT)**, a SOL market with a 1% fee and a 10 SOL graduation threshold, opened on 2026-10-12. The team ran the trader journey on it from its own wallet between 15:57 and 16:00 UTC. Every amount below is read from the router's events in each transaction.
+
+| Step | What happened | Transaction |
+| --- | --- | --- |
+| Launch | The router opens the market on the Zero-PvP preset | [`mK7SEsWt…zJgs94Ed`](https://explorer.solana.com/tx/mK7SEsWt4s2Z62DzUyWmqwLnWVeNbAcsg96m59T8T9qSvT1firgabonXrWUHwf4nPCTdG9CrvMhbDH5zJgs94Ed) |
+| Buy 0.1 SOL | 99,000,000 lamports go into the curve; basis 98,999,984 lamports; 30,766,240.11 TCAT | [`DJDAZsQJ…oCZxhSTu`](https://explorer.solana.com/tx/DJDAZsQJwa4Qw55YqpeeL1iiPdg8uFxewDmqUynLijAdyoyoSqq4f3tPt1NestbCWzUMUiaP1tV57WfoCZxhSTu) |
+| Second buy 0.1 SOL | Basis of the position: 197,999,968 lamports | [`5Gb82MF3…JRtHRTw6`](https://explorer.solana.com/tx/5Gb82MF33KAyf6cfqVvd3YrXKDftm6rpkY4fnsk6Ro2TasxorgPQMZ2q8hWvmF2SnuNyEkf53EFfP6MgJRtHRTw6) |
+| Auto-Exit on | Deadline set 24 hours ahead | [`3gVvxdLv…YoEcQ8hL`](https://explorer.solana.com/tx/3gVvxdLvHeeA7o986f9Ns6tgoP4ULP2sjgqqS4a3EoNKFnenfFpthCrKmU4bGNZkSiUqE6Qw1XxgHVSFYoEcQ8hL) |
+| Auto-Exit off | Deadline cleared | [`39XL7qcC…pBFzYi5r`](https://explorer.solana.com/tx/39XL7qcCth2LGZfpAgDKuJ8rwxX5bSJkzQNrfCpCMMKVr3GUnD6QEVf1naiXbpLzTjDSz2z7xyW7KjJ7pBFzYi5r) |
+| Exit at cost | Refund 196,019,966 = 197,999,968 − 1,980,000 (1% fee, rounded up) − 2 | [`27ooMMTm…9ogCcL6v`](https://explorer.solana.com/tx/27ooMMTmmck77JZWai7oHjRCyYvisgQCwn7BLvwTxkXRoS8G4rBsZQj4zfvxYpdvdCwQqUd46GWWnQKA9ogCcL6v) |
+| Buy 0.1 SOL again | Basis 98,999,984 lamports | [`3ZDzqNED…yNQSDr5m`](https://explorer.solana.com/tx/3ZDzqNED5ZXCFXFzYpY8FkniYVgU3R2CiqKT1bN4CsqrRYe15vSHuHAKyViWYdLDP7s9mWme74YEMZFhyNQSDr5m) |
+| Exit at cost | Refund 98,009,982 = 98,999,984 − 990,000 − 2, the floor the app showed before the exit | [`j3NNdaFL…UsDYL3ng`](https://explorer.solana.com/tx/j3NNdaFLAwXN4QydtrmnsX68Qno47vTEHX6UjEvxBLsFPJToYsJMseXn9qY3e7u1uzqkhgTcfxCUBwRUsDYL3ng) |
+
+Market [`4DVDUAiWgMPpe2oPjKtAHqYSHMe2Mww6H59EgxdUBa5T`](https://explorer.solana.com/address/4DVDUAiWgMPpe2oPjKtAHqYSHMe2Mww6H59EgxdUBa5T), mint [`EFRXppU9U9pniwDVCD1kaosNQV3HzhKqY7XrcuMvFmC2`](https://explorer.solana.com/address/EFRXppU9U9pniwDVCD1kaosNQV3HzhKqY7XrcuMvFmC2), token page [trucee.fun/t/EFRX…FmC2](https://trucee.fun/t/EFRXppU9U9pniwDVCD1kaosNQV3HzhKqY7XrcuMvFmC2). The curve has not graduated yet, so the graduation steps (finalize, DAMM v2 migration and claims) are shown by the devnet run below.
+
 ## Proof on devnet
 
 The final end-to-end run walked one fresh SOL market (graduation threshold 0.3 SOL, 1% fee) through the whole trader journey on router v5 (before the fee cap) on devnet, on 2026-10-11 from 14:16 to 14:20 UTC. It used the same SDK functions as the app and ran the crank's real jobs one tick at a time against that market. It finished with **13 passed, 0 failed**. An earlier run of the same script (13:27 to 13:31 UTC) also passed 13 of 13 checks, with the same amounts.

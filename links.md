@@ -20,7 +20,8 @@ The SDK exports the same addresses as `ROUTER_PROGRAM_ID`, `HOOK_PROGRAM_ID` and
 | --- | --- |
 | Source code (GitHub) | Not yet public |
 | Web app | [trucee.fun](https://trucee.fun) (mainnet), [devnet.trucee.fun](https://devnet.trucee.fun) (devnet) |
-| X | Not yet announced |
+| First mainnet market | [Trucee Cat (TCAT)](https://trucee.fun/t/EFRXppU9U9pniwDVCD1kaosNQV3HzhKqY7XrcuMvFmC2), see [For traders → Proof on mainnet](traders.md#proof-on-mainnet) |
+| X | [@truceefun](https://x.com/truceefun) |
 
 ## Built on
 
