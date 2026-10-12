@@ -9,7 +9,7 @@
   - Every local suite and the solvency fuzz run on the final source (see Verification).
 - **Result:** three preset findings fixed (two HIGH, one LOW) and one test gap closed. Six items accepted with reasons, four of them informational. No open findings.
 
-This records router v5 (before the fee cap) and its verification results. The current devnet router also caps the static trading fee at 1%; that later change is documented in the [Programs reference](../developers/programs.md#init_market). The error-order tests and counts below describe the reviewed snapshot.
+This records router v5 (before the fee cap) and its verification results. The current router, on devnet and mainnet, also caps the static trading fee at 1%; that later change is documented in the [Programs reference](../developers/programs.md#init_market). The error-order tests and counts below describe the reviewed snapshot.
 
 ## Findings
 

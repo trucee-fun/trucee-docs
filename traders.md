@@ -9,7 +9,7 @@ description: >-
 On a Trucee token, the trade panel offers two actions before graduation: **Buy** and **Exit at cost**. Every buy records your cost basis. An exit pays that basis back, minus the fee at cost and a 2-lamport haircut, wherever the price is. Until graduation, the amount you would get back is shown as **Your floor**. When the curve graduates, exits at cost end, the token becomes freely transferable, and holders split the market's surplus by basis. [How it works](how-it-works.md) explains the mechanism. This page follows the screens of the Trucee web app.
 
 {% hint style="warning" %}
-**Status on 2026-10-12.** Trucee runs on Solana devnet only, with the default router build: v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024), upgraded in slot 510258390. SOL is the only quote token on devnet. The programs are not independently reviewed, and the web app is not public yet (see [Links](links.md)). Trucee's crank runs its Auto-Exit, `finalize`, surplus-claim and migration jobs on its own: the final end-to-end run below used every one of them, and on devnet the crank also ran unattended against a graduated market.
+**Status on 2026-10-12.** Trucee went live on Solana mainnet on 2026-10-12, and also runs on devnet, with the same program IDs and the default router build: v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024), upgraded on devnet in slot 510258390. Mainnet markets can be quoted in SOL, TSLAx or NVDAx; SOL is the only quote token on devnet. The programs are not independently reviewed. The web app is [trucee.fun](https://trucee.fun) on mainnet and [devnet.trucee.fun](https://devnet.trucee.fun) on devnet (see [Links](links.md)). Trucee's crank runs its Auto-Exit, `finalize`, surplus-claim and migration jobs on its own, on mainnet and devnet: the final end-to-end run below used every one of them, and on devnet the crank also ran unattended against a graduated market.
 {% endhint %}
 
 ## Where things are
@@ -171,7 +171,7 @@ The curve graduates when its quote reserve reaches the launch's graduation thres
 | Banner title | Meaning |
 | --- | --- |
 | Graduated — awaiting DAMM v2 migration | The pool has not moved to Meteora DAMM v2 yet. The banner notes that anyone can migrate it at [migrator.meteora.ag](https://migrator.meteora.ag), and that your surplus share can be claimed already |
-| Graduated — now trading on DAMM v2 | The token trades in a Meteora DAMM v2 pool. On devnet the banner shows the DAMM v2 pool address. On mainnet, once Trucee is deployed there, it links to **Trade on Meteora** and **Swap on Jupiter** |
+| Graduated — now trading on DAMM v2 | The token trades in a Meteora DAMM v2 pool. On devnet the banner shows the DAMM v2 pool address. On mainnet it links to **Trade on Meteora** and **Swap on Jupiter** |
 
 ## Claim your surplus
 

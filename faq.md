@@ -3,7 +3,7 @@
 Short answers to the questions people ask most. The [Introduction](README.md) has the overview, [How it works](how-it-works.md) walks through the mechanism, and [Security](security.md) covers invariants, tests and known limits.
 
 {% hint style="info" %}
-**Status on 2026-10-12.** Trucee runs on Solana devnet and is not deployed on mainnet yet. Devnet now runs router v5 plus the 1% launch fee cap. Answers marked **v5** describe unchanged features that have run on devnet since the router v5 upgrade on 2026-10-11.
+**Status on 2026-10-12.** Trucee went live on Solana mainnet on 2026-10-12, and also runs on devnet, with the same program IDs. Both run router v5 plus the 1% launch fee cap. Answers marked **v5** describe unchanged features that have run on devnet since the router v5 upgrade on 2026-10-11, and on mainnet since the deploy on 2026-10-12.
 {% endhint %}
 
 ## General
@@ -28,7 +28,7 @@ No. Risk scanners flag tokens whose transfer hook restricts selling, so a Trucee
 
 1. **Exits are never blocked.** Before graduation, every holder can sell back through the router at any time and receive their cost basis, minus the fee and haircut described under [What is my floor?](#what-is-my-floor). The router sells your tokens into the curve and pays your refund from the market's buffer. The router has no pause switch and no admin instruction. Its instructions are `init_market`, `buy`, `sell`, `finalize` and `claim_surplus`, plus `set_auto_exit` and `auto_exit` in v5.
 2. **DBC removes the hook at graduation.** Meteora's DBC program revokes the transfer hook on the swap that completes the curve. That happens in DBC's own code and is not a Trucee setting. From then on the token is a plain Token-2022 token that you can send and trade anywhere.
-3. **The upgrade authority is disclosed.** Both programs, the hook and the router, are upgradeable. On devnet, both have the upgrade authority `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE`. You can check it with `solana program show <program id> --url devnet`. The programs are not deployed on mainnet yet. This page will name the mainnet authority once they are.
+3. **The upgrade authority is disclosed.** Both programs, the hook and the router, are upgradeable. On mainnet and on devnet, both have the same upgrade authority, `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE`. You can check it with `solana program show <program id> --url mainnet-beta`, or `--url devnet`.
 
 Here is what the design does restrict. Before graduation you cannot take a profit, and you cannot send the token to another wallet. Those limits are the point of the mechanism.
 
@@ -55,7 +55,7 @@ The floor holds until graduation, however far the price falls, because the route
 ### Is there a limit on how much I can buy?
 
 {% hint style="info" %}
-**v5:** live on devnet since the router v5 upgrade (2026-10-11).
+**v5:** live on devnet since the router v5 upgrade (2026-10-11), and on mainnet since the deploy (2026-10-12).
 {% endhint %}
 
 Yes. No buy may leave a position above 20% of the curve's base supply for sale, which is the DBC config's `swap_base_amount`. A buy that would cross the cap fails with error 6022 `PositionCapExceeded`. After a partial exit you can buy back up to the cap. As a result, a curve needs at least five holders to graduate.
@@ -67,7 +67,7 @@ The cap can be enforced because tokens cannot move between wallets before gradua
 ### Can I set an exit date and walk away?
 
 {% hint style="info" %}
-**v5:** live on devnet since the router v5 upgrade (2026-10-11).
+**v5:** live on devnet since the router v5 upgrade (2026-10-11), and on mainnet since the deploy (2026-10-12).
 {% endhint %}
 
 Yes, with Auto-Exit. Turning it on takes two steps:
@@ -134,7 +134,7 @@ The current build accepts three quote tokens. Each one caps how much a curve can
 | Tokenized Tesla shares (xStocks) | 5 shares |
 | Tokenized Nvidia shares (xStocks) | 10 shares |
 
-Devnet launches use SOL. Devnet has no xStock mints, so xStock markets are tested only in LiteSVM against mainnet snapshots. Note that the issuer of an xStock can pause or claw back balances of that token.
+On mainnet, a launch can use any of the three. Devnet launches use SOL. Devnet has no xStock mints, so xStock markets are tested only in LiteSVM against mainnet snapshots. Note that the issuer of an xStock can pause or claw back balances of that token.
 
 *Source: [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`QUOTE_CAPS`, `check_launch_caps`).*
 
@@ -150,20 +150,22 @@ No. Both programs are not independently reviewed. They have had internal reviews
 * LiteSVM suites run against the real DBC program and cover Auto-Exit, the per-position cap, Native Referral, the preset checks, the launch caps and xStock quotes.
 * On devnet, router v5 (before the fee cap) passed a 15/15 smoke run, in which the Anti-Whale cap rejected 14 of 40 random trades live. The final end-to-end run on that previous build then walked the whole journey (launch, buys, exit at cost before graduation, Auto-Exit, graduation, DAMM v2 migration, surplus claims) and passed 13 of 13 checks.
 
-An internal security review of router v5 ([Router v5 review](security/router-v5-review.md)) found three preset issues, two of them HIGH. All are fixed in the build on devnet, and none is open. It is not an independent security review. Because the code is not independently reviewed, the default build limits the accepted quote tokens and caps graduation sizes (see [What can I pay with?](#what-can-i-pay-with)). The [Security](security.md) page lists every test suite with its command and latest result.
+An internal security review of router v5 ([Router v5 review](security/router-v5-review.md)) found three preset issues, two of them HIGH. All are fixed in the build on mainnet and devnet, and none is open. It is not an independent security review. Because the code is not independently reviewed, the default build limits the accepted quote tokens and caps graduation sizes (see [What can I pay with?](#what-can-i-pay-with)). The [Security](security.md) page lists every test suite with its command and latest result.
 
 *Source: [test_sim.py](https://github.com/trucee-fun/trucee-sim/blob/main/test_sim.py), [replay_diff.py](https://github.com/trucee-fun/trucee-sim/blob/main/replay_diff.py), [run_fuzz.py](https://github.com/trucee-fun/trucee-sim/blob/main/run_fuzz.py), [src/zpvp_negative.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_negative.ts), [src/zpvp_auto_exit.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_auto_exit.ts), [src/zpvp_anti_whale.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_anti_whale.ts), [src/zpvp_referral.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_referral.ts), [src/zpvp_preset.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_preset.ts), [src/zpvp_caps.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_caps.ts), [src/zpvp_xstocks.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_xstocks.ts), [src/zpvp_e2e.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_e2e.ts); [out/e2e_devnet_v6.json](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/out/e2e_devnet_v6.json); [out/e2e-devnet-final.json](https://github.com/trucee-fun/trucee-worker/blob/main/out/e2e-devnet-final.json); [Router v5 review](security/router-v5-review.md).*
 
 ### Where is Trucee deployed?
 
-| Program | Devnet program ID |
+| Program | Program ID (mainnet and devnet) |
 | --- | --- |
 | Hook (`zpvp_hook`) | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` |
 | Router (`zpvp_router`) | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` |
 
-Devnet runs the default build of [trucee-programs main](https://github.com/trucee-fun/trucee-programs): router v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024). Auto-Exit, the 20% per-position cap, Native Referral and the preset checks are unchanged. The router is 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`. Its upgrade transaction is `2x4JHAYtDbvijNiHzv5rDvXjQVPc7hkbW2YbbnUxMGmuUSBTMbUFdtmey9YCWsUqCBGDPsbNMm3qE5N71V9bhQ2y`, in slot 510258390. The hook is unchanged, sha256 `1525c836…`. Neither program is deployed on mainnet yet. The planned release uses these two default builds; a reproducible `solana-verify` build is still in progress (see [Security → Upgrade authority](security.md#upgrade-authority)). For the upgrade authority, see [Is this a honeypot?](#is-this-a-honeypot).
+Trucee went live on Solana mainnet on 2026-10-12 and also runs on devnet, with the same program IDs. Both run the default build of [trucee-programs main](https://github.com/trucee-fun/trucee-programs): router v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024). Auto-Exit, the 20% per-position cap, Native Referral and the preset checks are unchanged.
 
-*Source: [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs) and [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`declare_id!`); `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet` (last deployed in slot 510258390).*
+On mainnet, both programs are the reproducible `solana-verify` build of that source. The router is 439,904 bytes, sha256 `370c0756f948f95ade4c15170897791c9e52c3c2a6d82d8986c9e51dfc233030`, deployed in slot 456095594. The hook's sha256 begins `1dbde487…`. On devnet, the router is a macOS `cargo build-sbf` build of the same source: 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`. Its upgrade transaction is `2x4JHAYtDbvijNiHzv5rDvXjQVPc7hkbW2YbbnUxMGmuUSBTMbUFdtmey9YCWsUqCBGDPsbNMm3qE5N71V9bhQ2y`, in slot 510258390. The devnet hook is unchanged, sha256 `1525c836…`. The bytes differ because they are different builds of the same source. Deploy signatures and full hashes are under [Security → Upgrade authority](security.md#upgrade-authority). For the upgrade authority, see [Is this a honeypot?](#is-this-a-honeypot).
+
+*Source: [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs) and [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`declare_id!`); `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url mainnet-beta` (deployed in slot 456095594); `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet` (last deployed in slot 510258390).*
 
 ## Wallets
 
@@ -182,7 +184,7 @@ The wallet does not have to handle the hook itself. Every buy and exit already c
 
 **Pending: the hands-on check.** The Trucee team will try a buy and an exit at cost by hand with each of Phantom, Solflare and Backpack on devnet. That check has to run from a hosted HTTPS site, because Phantom does not add its guard instructions on `localhost`. It will also show how each wallet's preview labels a new Token-2022 token, and whether Phantom shows its warning for a domain it has not reviewed yet. This answer will list the results once the check is done.
 
-Buys and exits go through the Trucee router, which the Trucee app and SDK call for you. Neither the app nor the SDK is public yet (see [Links](links.md)). After graduation, the token works like any other Token-2022 token.
+Buys and exits go through the Trucee router, which the Trucee app and SDK call for you. The app is at [trucee.fun](https://trucee.fun) on mainnet and [devnet.trucee.fun](https://devnet.trucee.fun) on devnet. The SDK is not public yet (see [Links](links.md)). After graduation, the token works like any other Token-2022 token.
 
 *Source:; [src/rsc01_injected_ixs.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/rsc01_injected_ixs.ts); [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs) (`transfer_hook` reads `get_instruction_relative(0)`); [src/instructions.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/instructions.ts) (`routerSwapInstruction`).*
 

@@ -3,14 +3,14 @@
 This page covers the rules the two Trucee programs enforce, the tests behind them, how far the code has been reviewed, and the known limits. Every number names the file, command or transaction it comes from. Source links point to the published repositories; commands use the sibling workspace folders shown in the [Introduction](README.md#source-repositories).
 
 {% hint style="warning" %}
-**Status as of 2026-10-12:** the programs are **not independently reviewed** and deployed on **devnet only**. Both are upgradeable, and the upgrade authority is a single key held by the team (see [Upgrade authority](#upgrade-authority)). Mainnet is not deployed yet.
+**Status as of 2026-10-12:** the programs are **not independently reviewed**. They are deployed on **mainnet** (since 2026-10-12) and **devnet**, with the same program IDs. Both are upgradeable, and the upgrade authority is a single key held by the team (see [Upgrade authority](#upgrade-authority)).
 {% endhint %}
 
 | Item | Status | Source |
 |---|---|---|
 | Programs | `zpvp_hook` (Token-2022 transfer hook) and `zpvp_router` (cost-basis router), Anchor 0.32.1 | [Anchor.toml](https://github.com/trucee-fun/trucee-programs/blob/main/Anchor.toml), [programs/](https://github.com/trucee-fun/trucee-programs/tree/main/programs/) |
-| Deployed | Devnet only. The router runs the default build of trucee-programs main: v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024), 439,912 bytes, sha256 `38b88ec9…`, upgraded in slot 510258390. Auto-Exit, the Anti-Whale 20% cap, Native Referral and preset checks are unchanged. | `solana program show`; [Upgrade authority](#upgrade-authority) |
-| Mainnet release | Not deployed. Planned release: the reproducible `solana-verify` builds of the same source, router `370c0756…` and hook `1dbde487…`. | [Upgrade authority](#upgrade-authority) |
+| Deployed | Mainnet and devnet, with the same program IDs. Both run the default build of trucee-programs main: v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024). Auto-Exit, the Anti-Whale 20% cap, Native Referral and preset checks are unchanged. The devnet router is 439,912 bytes, sha256 `38b88ec9…`, upgraded in slot 510258390. | `solana program show`; [Upgrade authority](#upgrade-authority) |
+| Mainnet release | Deployed on 2026-10-12: the reproducible `solana-verify` builds of the same source, router `370c0756…` (slot 456095594) and hook `1dbde487…` (slot 456095540). | `solana program show <PROGRAM_ID> --url mainnet-beta`; [Upgrade authority](#upgrade-authority) |
 | Independent security review | None | — |
 | Internal review of router v5 | Done: three preset findings fixed, none open. Not an independent security review | [Review status](#review-status) |
 
@@ -28,20 +28,20 @@ What you still have to trust is the upgrade authority. An upgrade could change a
 
 ## Upgrade authority
 
-| Program | Program ID | Devnet upgrade authority | Mainnet |
+| Program | Program ID | Devnet upgrade authority | Mainnet upgrade authority |
 |---|---|---|---|
-| `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE` | Not deployed yet |
-| `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE` | Not deployed yet |
+| `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE` | `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE` |
+| `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE` | `CamCkeR9iqBij1ZyrEYj9mp6emQtpMVdWWVCUX46tFLE` |
 
-- Source: `solana program show <PROGRAM_ID> --url devnet`, read on 2026-10-12. The router was last deployed in slot 510258390 and the hook in slot 506686788. You can run the same command to check the current values.
+- Source: `solana program show <PROGRAM_ID> --url devnet` and `solana program show <PROGRAM_ID> --url mainnet-beta`, read on 2026-10-12. On devnet, the router was last deployed in slot 510258390 and the hook in slot 506686788. On mainnet, the router was deployed in slot 456095594 and the hook in slot 456095540. You can run the same commands to check the current values.
 - **Current devnet router:** the default build of [trucee-programs](https://github.com/trucee-fun/trucee-programs), which includes the 1% fee cap: `zpvp_router.so`, 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`, deploy signature `2x4JHAYtDbvijNiHzv5rDvXjQVPc7hkbW2YbbnUxMGmuUSBTMbUFdtmey9YCWsUqCBGDPsbNMm3qE5N71V9bhQ2y`. Its program data account is 449,344 bytes because it was extended before the upgrade; the first 439,912 bytes match that hash and the rest is zero padding.
 - **Previous devnet router (v5, before the fee cap):** 439,104 bytes, sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5`, deploy signature `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r`. The upgrade before it has the deploy signature `3MujRv1kxL92cPVWXAbXrqeaVF4BbuTdFZJnwvzbjrCGeTuXRQ1tPCxVRnkXiFx3Y3Ayep2N25HX9ztgYNDZeiZ4`.
-- **Hook:** unchanged since the [Router v5 review](security/router-v5-review.md): `zpvp_hook.so`, 210,552 bytes, sha256 `1525c836b1d201457abd6f1291b4f64d896338cf205901e946e009be97ea81e3`.
-- **Mainnet:** not deployed yet. The planned release is the reproducible Linux `solana-verify build` of the same trucee-programs source (`solana-verify build --library-name zpvp_router`, then `zpvp_hook`): `zpvp_router.so` 439,904 bytes, sha256 `370c0756f948f95ade4c15170897791c9e52c3c2a6d82d8986c9e51dfc233030` (executable hash `e9c0ce9d55ca7844c2d49b1d82629eb0ba6e695cf793f50878c751f3226bc918`), and `zpvp_hook.so` 210,536 bytes, sha256 `1dbde487a10902638795d25a4cefb7ad6e4a175358d0011894c7fd0f10f55127` (executable hash `a3e219cbf35866039c7929bc83b7d1707cbdca1fbad38246f0b631df2e2ee0a9`). The devnet bytes above differ because devnet runs a macOS `cargo build-sbf` build of the same source. After the mainnet deploy, `solana-verify verify-from-repo` checks the on-chain bytes against the repository.
-- The authority is one team-held keypair, not a multisig.
+- **Devnet hook:** unchanged since the [Router v5 review](security/router-v5-review.md): `zpvp_hook.so`, 210,552 bytes, sha256 `1525c836b1d201457abd6f1291b4f64d896338cf205901e946e009be97ea81e3`.
+- **Mainnet:** deployed on 2026-10-12 from the reproducible Linux `solana-verify build` of the same trucee-programs source (`solana-verify build --library-name zpvp_router`, then `zpvp_hook`): `zpvp_router.so` 439,904 bytes, sha256 `370c0756f948f95ade4c15170897791c9e52c3c2a6d82d8986c9e51dfc233030` (executable hash `e9c0ce9d55ca7844c2d49b1d82629eb0ba6e695cf793f50878c751f3226bc918`), deploy signature `5tFoym3ER1A6EMA2Z93oHX1XM9o68EeR62Pzkm96znoXEuA7u4nkfPRxhgAmEUKUP6qvpkw8ZBRMpHXnNFWqJX5`, and `zpvp_hook.so` 210,536 bytes, sha256 `1dbde487a10902638795d25a4cefb7ad6e4a175358d0011894c7fd0f10f55127` (executable hash `a3e219cbf35866039c7929bc83b7d1707cbdca1fbad38246f0b631df2e2ee0a9`), deploy signature `3AxyrybtiZBuPcQeUgVi7wdwNhLQjVjWyp2vNG3xR2DJbBYwzoFmhkoRgYkDJoiCn7pNVWD3eJCdcAfP9ER1Se3w`. `solana-verify get-program-hash -u <mainnet RPC> <PROGRAM_ID>` returns these two executable hashes. The devnet bytes above differ because devnet runs a macOS `cargo build-sbf` build of the same source. Once the source repositories are public, `solana-verify verify-from-repo` can check the on-chain bytes against the repository.
+- On both clusters, the authority is the same team-held keypair, not a multisig.
 - The program IDs are fixed in code: the hook accepts only `D4sk6w…` as the router (`ROUTER_ID`), and the router opens markets only for pools whose hook is `CUNNV1…` (`ZPVP_HOOK_ID`).
 
-The current devnet router adds a static-fee cap to the recorded v5 build: `init_market` rejects a config above **1%** (100 bps, fee numerator 10,000,000) with `FeeTooHigh` (**6024**, "Config fee is above the 1% cap"). Until graduation, the floor is basis minus the fee at cost (at most 1%, rounded up to a raw quote unit) minus the **2-lamport haircut**, floored at zero. This cap applies when a market opens; markets opened before it (on devnet, before slot 510258390) are not re-checked. The LiteSVM suite [src/zpvp_caps.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_caps.ts) probes exactly 1% (accepted) and one fee-numerator unit above (rejected with 6024).
+The current router, on mainnet and devnet, adds a static-fee cap to the recorded v5 build: `init_market` rejects a config above **1%** (100 bps, fee numerator 10,000,000) with `FeeTooHigh` (**6024**, "Config fee is above the 1% cap"). Until graduation, the floor is basis minus the fee at cost (at most 1%, rounded up to a raw quote unit) minus the **2-lamport haircut**, floored at zero. This cap applies when a market opens; markets opened before it (on devnet, before slot 510258390) are not re-checked. The LiteSVM suite [src/zpvp_caps.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_caps.ts) probes exactly 1% (accepted) and one fee-numerator unit above (rejected with 6024).
 
 ## Invariants
 

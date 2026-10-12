@@ -10,7 +10,7 @@ Two Solana programs make that work:
 Everything else is DBC doing what it already does: the curve, the fees, graduation, revoking the hook, and the migration to DAMM v2.
 
 {% hint style="info" %}
-**What runs where (2026-10-12).** Steps 1 to 7, 9 (Auto-Exit) and 10 (Anti-Whale cap) describe router v5 plus the 1% launch fee cap, the current devnet build. Step 8 is DBC's own migration. Trucee's crank runs the jobs for finalize, claims, auto-exits and migrations on its own: on devnet it finalized, migrated and claimed a graduated market unattended. Details: [Status](#status).
+**What runs where (2026-10-12).** Steps 1 to 7, 9 (Auto-Exit) and 10 (Anti-Whale cap) describe router v5 plus the 1% launch fee cap, the current build on mainnet and devnet. Step 8 is DBC's own migration. Trucee's crank runs the jobs for finalize, claims, auto-exits and migrations on its own: on devnet it finalized, migrated and claimed a graduated market unattended. Details: [Status](#status).
 {% endhint %}
 
 ## The lifecycle at a glance
@@ -142,7 +142,7 @@ cap = floor(swap_base_amount × 2,000 ÷ 10,000)
 
 ## Status
 
-As of 2026-10-12. Devnet runs the default build of [trucee-programs main](https://github.com/trucee-fun/trucee-programs), upgraded in slot 510258390: router v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024). Auto-Exit, the 20% Anti-Whale cap, Native Referral and preset checks are unchanged. The router is 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`; the hook is unchanged, sha256 `1525c836…`. Mainnet is not deployed. The planned release uses these two default builds; a reproducible `solana-verify` build is still in progress. The deployment signature and full hashes are under [Security → Upgrade authority](security.md#upgrade-authority). Recorded v5 runs below used the previous build, before the fee cap.
+As of 2026-10-12. Trucee went live on Solana mainnet on 2026-10-12, and also runs on devnet, with the same program IDs. Both run the default build of [trucee-programs main](https://github.com/trucee-fun/trucee-programs): router v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024). Auto-Exit, the 20% Anti-Whale cap, Native Referral and preset checks are unchanged. Mainnet runs the reproducible `solana-verify` build of that source (router sha256 `370c0756…`, hook `1dbde487…`). Devnet, upgraded in slot 510258390, runs a macOS `cargo build-sbf` build of the same source: the router is 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`; the hook is unchanged, sha256 `1525c836…`. The bytes differ because they are different builds of the same source. The deployment signatures and full hashes are under [Security → Upgrade authority](security.md#upgrade-authority). Every program piece in the table below is also live on mainnet, and Trucee's crank runs there too. The **Devnet** column shows what has run on devnet. Recorded v5 runs below used the previous devnet build, before the fee cap.
 
 | Piece | Source on `main` | Devnet |
 | --- | --- | --- |
@@ -160,7 +160,7 @@ As of 2026-10-12. Devnet runs the default build of [trucee-programs main](https:
 
 Features that are not built are listed on the [Roadmap](roadmap.md), not here.
 
-Devnet program IDs:
+Program IDs, the same on mainnet and devnet:
 
 * `zpvp_router`: `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb`
 * `zpvp_hook`: `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS`
@@ -186,6 +186,7 @@ Source links point to the published repositories. Every number on this page come
 | Partial-fill buys | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`buy`, `SWAP_MODE_PARTIAL_FILL`), [dbc_curve.py](https://github.com/trucee-fun/trucee-sim/blob/main/dbc_curve.py) (`buy`) |
 | Surplus snapshot and pro-rata claim, rent back to the owner, `SurplusOverclaimed` | [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`finalize`, `claim_surplus`), [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs) (`surplus_share`) |
 | Final devnet end-to-end run on router v5 (before the fee cap): 13 passed, 0 failed; surplus 15,045,373 lamports, 7 claims totalling 15,045,370; a buy above the cap rejected with 6022; DAMM v2 pool `6W3BGqQDWBJqfrEARB3jfbpWmZaAEjMESyCScnmo8TBP` | [scripts/e2e-devnet.ts](https://github.com/trucee-fun/trucee-worker/blob/main/scripts/e2e-devnet.ts); [out/e2e-devnet-final.json](https://github.com/trucee-fun/trucee-worker/blob/main/out/e2e-devnet-final.json) (commit [0c6f40e](https://github.com/trucee-fun/trucee-worker/commit/0c6f40e), steps 6, 9, 10 and 11); devnet migration transaction `2Pos6pHCTzpviqC2HHQ8THR27WGzMMqZGtdKFpN5KqaBDvioF6YE8d8mQyxCPVqdLsb6cmrJeuScxSn6RQXU6mJA` and first claim `4bDKeg824SZtBW27Fq1hba936nbRw5XXE2QwJDbfCzG9w54fJuAkNowWFxH9R8bAtqX18rTNDFF33TdJ6TekGAMF` |
+| Mainnet since 2026-10-12: the reproducible `solana-verify` build of the same source, router sha256 `370c0756f948f95ade4c15170897791c9e52c3c2a6d82d8986c9e51dfc233030` deployed in slot 456095594, hook sha256 `1dbde487a10902638795d25a4cefb7ad6e4a175358d0011894c7fd0f10f55127` deployed in slot 456095540 | `solana program show <PROGRAM_ID> --url mainnet-beta`; [Security → Upgrade authority](security.md#upgrade-authority) |
 | Current devnet router: default build of trucee-programs main, v5 plus the 1% fee cap, 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`, last deployed in slot 510258390 | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet`; devnet deploy transaction `2x4JHAYtDbvijNiHzv5rDvXjQVPc7hkbW2YbbnUxMGmuUSBTMbUFdtmey9YCWsUqCBGDPsbNMm3qE5N71V9bhQ2y`; [Security → Upgrade authority](security.md#upgrade-authority) |
 | Previous devnet build: router v5 (before the fee cap), source [13662fd](https://github.com/trucee-fun/trucee-programs/commit/13662fd), 439,104 bytes, sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5`, upgraded in slot 509900704 | Devnet deploy transaction `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r`; [Security → Upgrade authority](security.md#upgrade-authority) |
 | Router v5 (before the fee cap) smoke run on devnet: 15 passed, 0 failed; 14 of 40 random trades rejected with 6022 | [out/e2e_devnet_v6.json](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/out/e2e_devnet_v6.json) (commit [0bb9bee](https://github.com/trucee-fun/trucee-litesvm-diff/commit/0bb9bee)) |

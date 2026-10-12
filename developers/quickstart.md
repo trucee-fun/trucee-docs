@@ -19,13 +19,13 @@ It reads accounts and builds and signs transactions in memory. It never sends a 
 The file is [examples/quickstart.ts](https://github.com/trucee-fun/trucee-docs/blob/main/examples/quickstart.ts), and this page embeds it verbatim. It typechecks against the SDK's public API with `cd sdk && npm ci && cd ../gitbook/examples && npm ci && npx tsc --noEmit`.
 
 {% hint style="warning" %}
-**Status:** the Trucee programs run on Solana devnet only. They are not independently reviewed and not deployed to mainnet. `@trucee/sdk` is not published to the npm registry and the source repository is not public yet (see [Links](../links.md)), so for now you install the SDK from a checkout of the source.
+**Status:** the Trucee programs run on Solana mainnet (since 2026-10-12) and devnet, with the same program IDs. They are not independently reviewed. `@trucee/sdk` is not published to the npm registry and the source repository is not public yet (see [Links](../links.md)), so for now you install the SDK from a checkout of the source.
 {% endhint %}
 
 {% hint style="info" %}
 **What works today.** Every SDK call in the example is implemented, and the SDK's public API is pinned by its contract test ([test/contract.test.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/test/contract.test.ts)).
 
-The SDK also has Auto-Exit builders (`setAutoExitInstructions` and `autoExitInstruction`). Auto-Exit runs on devnet since the router v5 upgrade. This quickstart leaves it out to stay short; the [Programs reference](programs.md) documents both instructions.
+The SDK also has Auto-Exit builders (`setAutoExitInstructions` and `autoExitInstruction`). Auto-Exit runs on devnet since the router v5 upgrade, and on mainnet since the deploy. This quickstart leaves it out to stay short; the [Programs reference](programs.md) documents both instructions.
 {% endhint %}
 
 ## Install
@@ -313,7 +313,7 @@ try {
 
 ### Connect
 
-`getClusterConfig('devnet')` returns the frozen addressing config of a cluster: the Trucee router (`D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb`), the Trucee transfer hook (`CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS`), Meteora DBC (`dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN`) and the quote mints a market may use, each as a `QuoteMintInfo` (symbol, mint, decimals, token program, graduation cap). Devnet allows SOL only. The `mainnet-beta` config also lists the xStocks TSLAx and NVDAx, but the Trucee programs are not deployed to mainnet yet.
+`getClusterConfig('devnet')` returns the frozen addressing config of a cluster: the Trucee router (`D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb`), the Trucee transfer hook (`CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS`), Meteora DBC (`dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN`) and the quote mints a market may use, each as a `QuoteMintInfo` (symbol, mint, decimals, token program, graduation cap). Devnet allows SOL only. For mainnet, use `getClusterConfig('mainnet-beta')` with a mainnet RPC endpoint: it returns the same program IDs and also lists the xStocks TSLAx and NVDAx.
 
 `https://api.devnet.solana.com` is a placeholder public endpoint. Use your own RPC provider for anything beyond a quick test.
 
@@ -418,7 +418,7 @@ The router only opens a market for a config that:
 The full tables are `ROUTER_ERRORS` and `HOOK_ERRORS` in [src/errors.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/errors.ts).
 
 {% hint style="info" %}
-`PositionCapExceeded` comes from the Anti-Whale cap, which runs on devnet since the router v5 upgrade. A buy that would leave your position above 20% of the curve's sale supply fails with it.
+`PositionCapExceeded` comes from the Anti-Whale cap, which runs on devnet since the router v5 upgrade, and on mainnet since the deploy. A buy that would leave your position above 20% of the curve's sale supply fails with it.
 {% endhint %}
 
 ## After graduation

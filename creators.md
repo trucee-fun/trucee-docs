@@ -9,7 +9,7 @@ description: >-
 A Trucee launch is a Meteora DBC launch with one fixed preset. You choose the token's details, the quote token, the graduation threshold and an optional first buy. The preset fixes everything else, so that nobody, you included, gets tokens or liquidity without buying on the curve. Before graduation, every buyer can exit at their cost basis, minus the fee at cost and a 2-lamport haircut. [How it works](how-it-works.md) explains the mechanism.
 
 {% hint style="warning" %}
-**Status on 2026-10-12.** Trucee runs on Solana devnet only. Devnet runs the default build of trucee-programs main: router v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024), upgraded in slot 510258390. Auto-Exit, the 20% Anti-Whale cap, Native Referral and preset checks are unchanged. SOL is the only quote token on devnet. Trucee is not deployed on mainnet yet. The programs are not independently reviewed, and the web app is not public yet (see [Links](links.md)).
+**Status on 2026-10-12.** Trucee went live on Solana mainnet on 2026-10-12, and also runs on devnet, with the same program IDs. Both run the default build of trucee-programs main: router v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024); devnet was upgraded to it in slot 510258390. Auto-Exit, the 20% Anti-Whale cap, Native Referral and preset checks are unchanged. Mainnet accepts SOL, TSLAx and NVDAx as quote tokens; SOL is the only quote token on devnet. The programs are not independently reviewed. The web app is [trucee.fun](https://trucee.fun) on mainnet and [devnet.trucee.fun](https://devnet.trucee.fun) on devnet (see [Links](links.md)).
 {% endhint %}
 
 ## Launch a token
@@ -29,7 +29,7 @@ The web app's **Launch** page (`/launch`) runs the whole launch from one form. T
 | Graduation threshold | Yes | Above 0 and at most the quote token's cap. At most 9 decimal places for SOL and 8 for xStocks |
 | Initial buy | No | From 0 up to the graduation threshold. Leave it empty to skip it. See [Your initial buy](#your-initial-buy) |
 
-The pool writes the name, the symbol and a link to the metadata file on chain, and the preset makes them permanent (see [What the preset fixes](#what-the-preset-fixes)). The image, description and links are stored in the metadata file. The app stores that file and the image itself and serves them from its own metadata endpoint: on local disk when it runs on your machine, or in a private S3 bucket when a hosted deployment sets one. Nothing is publicly hosted yet.
+The pool writes the name, the symbol and a link to the metadata file on chain, and the preset makes them permanent (see [What the preset fixes](#what-the-preset-fixes)). The image, description and links are stored in the metadata file. The app stores that file and the image itself and serves them from its own metadata endpoint: on local disk when it runs on your machine, or in a private S3 bucket when a hosted deployment sets one.
 
 The metadata upload has two limits against abuse. By default it accepts at most 10 uploads per hour from one client IP address, and it pauses new uploads once the stored files reach a total size cap, 200 MB by default. When either limit applies, step 1 fails with "Metadata upload failed" and the server's reason (`rate_limited` or `storage_full`), and nothing is created on chain.
 
@@ -43,7 +43,7 @@ The curve graduates when its quote reserve reaches the graduation threshold. The
 | TSLAx (tokenized Tesla shares) | 8 | 5 shares | Mainnet-beta |
 | NVDAx (tokenized Nvidia shares) | 8 | 10 shares | Mainnet-beta |
 
-Mainnet is not deployed yet, so for now every launch is a SOL launch on devnet.
+On mainnet, a launch can use any of the three. Devnet has no xStock mints, so every devnet launch is a SOL launch.
 
 * **Above the cap.** The form rejects the threshold and the SDK throws. If a config gets past both, the router refuses to open its market: error 6018 `ThresholdTooHigh`, or 6017 `QuoteMintNotAllowed` for an unlisted quote token.
 * **xStocks.** The issuer of an xStock can pause transfers or claw back balances, including the market's buffer. See [Security → Known limitations](security.md#known-limitations). No xStock market is live yet. xStock quotes are tested in LiteSVM against mainnet snapshots only.
@@ -162,5 +162,6 @@ Source links point to the published repositories.
 | Trading-fee split: 20% protocol, referral 20% of the protocol share, 80% to the fee claimer, claimed with DBC `claim_trading_fee` | `fee_claimer` doc comment in [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs) |
 | xStock issuer powers | `QUOTE_CAPS` comment in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) |
 | Keepers migrate SOL pools only from 10 SOL; crank skips mainnet SOL pools below 1 SOL | [src/config.ts](https://github.com/trucee-fun/trucee-worker/blob/main/src/config.ts) |
+| Mainnet since 2026-10-12, same program IDs, the reproducible `solana-verify` build of the same source | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url mainnet-beta` (deployed in slot 456095594); [Security → Upgrade authority](security.md#upgrade-authority) |
 | Current devnet router: default build of trucee-programs main, v5 plus the 1% fee cap | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet` (last deployed in slot 510258390); [Security → Upgrade authority](security.md#upgrade-authority); [out/e2e-devnet-final.json](https://github.com/trucee-fun/trucee-worker/blob/main/out/e2e-devnet-final.json) (historical final devnet run on router v5 (before the fee cap), the previous build upgraded in slot 509900704) |
 | Retention Fee researched and cut after a security review; none of it in the router; the app's fee claimer is the creator's wallet | Revert on `main`: [77aa890](https://github.com/trucee-fun/trucee-programs/commit/77aa890) (programs) and [a419684](https://github.com/trucee-fun/trucee-litesvm-diff/commit/a419684) (tests); `feeClaimer` in [src/lib/launch/run-launch.ts](https://github.com/trucee-fun/trucee-app/blob/main/src/lib/launch/run-launch.ts) |

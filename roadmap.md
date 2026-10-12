@@ -8,7 +8,7 @@ Apart from the Shipped section, nothing below is live on any network. A roadmap 
 
 ## Shipped
 
-Devnet runs the default build of [trucee-programs main](https://github.com/trucee-fun/trucee-programs), upgraded in slot 510258390: router v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024). The router is 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`; the hook is unchanged, sha256 `1525c836…`. Mainnet is not deployed. The planned release uses these two default builds (see [Security → Upgrade authority](security.md#upgrade-authority) for full hashes and the deployment signature). Its on-chain features:
+Mainnet (since 2026-10-12) and devnet run the default build of [trucee-programs main](https://github.com/trucee-fun/trucee-programs), with the same program IDs: router v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024). Mainnet runs the reproducible `solana-verify` build of that source (router sha256 `370c0756…`, hook `1dbde487…`). Devnet, upgraded in slot 510258390, runs a macOS `cargo build-sbf` build of the same source: the router is 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`; the hook is unchanged, sha256 `1525c836…`. See [Security → Upgrade authority](security.md#upgrade-authority) for full hashes and the deployment signatures. The on-chain features:
 
 * **Core:** cost basis per position, exit at cost before graduation from a per-market buffer (minus the fee at cost and a 2-lamport haircut), the surplus split at graduation, and the transfer hook that keeps every pre-graduation trade inside the router.
 * **Auto-Exit:** set a deadline, and if the curve has not graduated by then, anyone can exit your whole position at cost before graduation for you.
@@ -18,6 +18,8 @@ Devnet runs the default build of [trucee-programs main](https://github.com/truce
 * **Launch fee cap:** `init_market` rejects static fees above 1% with `FeeTooHigh` (6024). Auto-Exit, the 20% Anti-Whale cap, Native Referral and preset checks are unchanged from v5.
 
 [How it works](how-it-works.md) describes each of them.
+
+**Mainnet deploy (2026-10-12).** Both programs run on Solana mainnet with the same program IDs as devnet. The web app is [trucee.fun](https://trucee.fun) on mainnet and [devnet.trucee.fun](https://devnet.trucee.fun) on devnet. Trucee's crank (`finalize`, DAMM v2 migration, surplus claims and Auto-Exit) runs on mainnet too.
 
 ### Native Referral
 
@@ -29,9 +31,7 @@ DBC pays the referral cut out of the **protocol** fee (20% of the protocol share
 
 The hackathon's on-chain scope is router v5 plus the fee cap above. Retention Fee, the last router feature in that scope, was cut before the scope freeze (2026-10-12 12:00 UTC); see [Research](#research). What is still in progress:
 
-* **Devnet hosting.** The web app and the crank are being set up on AWS for a public devnet demo. Nothing is publicly hosted yet; today they run locally against devnet.
-* **A verifiable mainnet build.** The reproducible `solana-verify` builds of both programs exist (router sha256 `370c0756…`, hook `1dbde487…`, see [Security](security.md#upgrade-authority)). What remains is the mainnet deploy and `solana-verify verify-from-repo` against the public repository.
-* **Mainnet deploy.** The planned release uses the current default router with the 1% fee cap and the unchanged hook, with the same program IDs as devnet. Neither program is on mainnet yet.
+* **Verify from the repository.** Mainnet runs the reproducible `solana-verify` builds of both programs (router sha256 `370c0756…`, hook `1dbde487…`, see [Security](security.md#upgrade-authority)), and `solana-verify get-program-hash` matches them. What remains is `solana-verify verify-from-repo` against the repository, once the source repositories are public.
 
 ## Planned features
 

@@ -2,12 +2,12 @@
 
 ## Programs
 
-Trucee runs on Solana **devnet** today. Mainnet: not yet deployed.
+Trucee runs on Solana **mainnet** (since 2026-10-12) and **devnet**. Both clusters use the same program IDs.
 
 | Program | Address | Devnet | Mainnet |
 | --- | --- | --- | --- |
-| Trucee router (`zpvp_router`) | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | [Explorer](https://explorer.solana.com/address/D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb?cluster=devnet) | Not yet deployed |
-| Trucee transfer hook (`zpvp_hook`) | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | [Explorer](https://explorer.solana.com/address/CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS?cluster=devnet) | Not yet deployed |
+| Trucee router (`zpvp_router`) | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | [Explorer](https://explorer.solana.com/address/D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb?cluster=devnet) | [Explorer](https://explorer.solana.com/address/D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb) |
+| Trucee transfer hook (`zpvp_hook`) | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | [Explorer](https://explorer.solana.com/address/CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS?cluster=devnet) | [Explorer](https://explorer.solana.com/address/CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS) |
 | Meteora Dynamic Bonding Curve (DBC) | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` | [Explorer](https://explorer.solana.com/address/dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN?cluster=devnet) | [Explorer](https://explorer.solana.com/address/dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN) |
 
 {% hint style="info" %}
@@ -19,7 +19,7 @@ The SDK exports the same addresses as `ROUTER_PROGRAM_ID`, `HOOK_PROGRAM_ID` and
 | Resource | Link |
 | --- | --- |
 | Source code (GitHub) | Not yet public |
-| Web app | Not yet public |
+| Web app | [trucee.fun](https://trucee.fun) (mainnet), [devnet.trucee.fun](https://devnet.trucee.fun) (devnet) |
 | X | Not yet announced |
 
 ## Built on
