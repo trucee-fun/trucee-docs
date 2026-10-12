@@ -32,8 +32,8 @@ Every number on this page names the file, test or command it comes from (see [So
 
 | Program | Program ID | Devnet | Mainnet-beta |
 |---|---|---|---|
-| `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | Deployed: default build, v5 plus the 1% fee cap (sha256 `38b88ec9…`, 439,912 bytes), last deployed in slot 510258390 | Not deployed. Planned release: the current default build (`38b88ec9…`) |
-| `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | Deployed, unchanged since [db71df2](https://github.com/trucee-fun/trucee-programs/commit/db71df2) (sha256 `1525c836…`) | Not deployed. Planned release: the unchanged default build (`1525c836…`) |
+| `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | Deployed: default build, v5 plus the 1% fee cap (sha256 `38b88ec9…`, 439,912 bytes), last deployed in slot 510258390 | Not deployed. Planned release: the `solana-verify` build (`370c0756…`) |
+| `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | Deployed, unchanged since [db71df2](https://github.com/trucee-fun/trucee-programs/commit/db71df2) (sha256 `1525c836…`) | Not deployed. Planned release: the `solana-verify` build (`1dbde487…`) |
 | Meteora DBC | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` | Meteora's program | Meteora's program |
 
 * **One ID per program on every cluster.** The IDs come from `declare_id!` in each program's [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs). The SDK exports them as `ROUTER_PROGRAM_ID`, `HOOK_PROGRAM_ID` and `DBC_PROGRAM_ID`, and `getClusterConfig()` returns the same three IDs for `devnet`, `mainnet-beta` and `localnet` ([src/constants.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/constants.ts)).

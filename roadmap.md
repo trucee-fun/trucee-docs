@@ -30,7 +30,7 @@ DBC pays the referral cut out of the **protocol** fee (20% of the protocol share
 The hackathon's on-chain scope is router v5 plus the fee cap above. Retention Fee, the last router feature in that scope, was cut before the scope freeze (2026-10-12 12:00 UTC); see [Research](#research). What is still in progress:
 
 * **Devnet hosting.** The web app and the crank are being set up on AWS for a public devnet demo. Nothing is publicly hosted yet; today they run locally against devnet.
-* **A verifiable mainnet build.** A reproducible `solana-verify` build of both programs is still in progress, so anyone can check deployed bytes against the source. The planned mainnet release uses the current default router and unchanged hook builds listed under [Security → Upgrade authority](security.md#upgrade-authority).
+* **A verifiable mainnet build.** The reproducible `solana-verify` builds of both programs exist (router sha256 `370c0756…`, hook `1dbde487…`, see [Security](security.md#upgrade-authority)). What remains is the mainnet deploy and `solana-verify verify-from-repo` against the public repository.
 * **Mainnet deploy.** The planned release uses the current default router with the 1% fee cap and the unchanged hook, with the same program IDs as devnet. Neither program is on mainnet yet.
 
 ## Planned features
