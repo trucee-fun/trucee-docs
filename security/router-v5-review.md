@@ -1,6 +1,6 @@
 # Router v5 security review
 
-- **Scope:** changes to [programs/](https://github.com/trucee-fun/trucee-programs/blob/main/programs/) and [src/](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/) between `ec652cc` and `9aa81b9`, plus the fixes made in this review. This covers xStock tests, Auto-Exit, Anti-Whale, Native Referral and preset hardening. The hook (`zpvp_hook`) is unchanged since `ec652cc`.
+- **Scope:** changes to [programs/](https://github.com/trucee-fun/trucee-programs/tree/main/programs/) and [src/](https://github.com/trucee-fun/trucee-litesvm-diff/tree/main/src/) between [db71df2](https://github.com/trucee-fun/trucee-programs/commit/db71df2) and [c7af674](https://github.com/trucee-fun/trucee-programs/commit/c7af674), plus the fixes made in this review. This covers xStock tests, Auto-Exit, Anti-Whale, Native Referral and preset hardening. The hook (`zpvp_hook`) is unchanged since [db71df2](https://github.com/trucee-fun/trucee-programs/commit/db71df2).
 - **Date:** 2026-10-11.
 - **Method:**
   - Line-by-line review of [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs), [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs) and [programs/zpvp_router/src/math.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/math.rs).
@@ -9,16 +9,16 @@
   - Every local suite and the solvency fuzz run on the final source (see Verification).
 - **Result:** three preset findings fixed (two HIGH, one LOW) and one test gap closed. Six items accepted with reasons, four of them informational. No open findings.
 
-This records the reviewed v5 snapshot and its verification results. The current source also caps the static trading fee at 1%; that later change is documented in the [Programs reference](../developers/programs.md#init_market). The error-order tests and counts below describe the reviewed snapshot.
+This records router v5 (before the fee cap) and its verification results. The current devnet router also caps the static trading fee at 1%; that later change is documented in the [Programs reference](../developers/programs.md#init_market). The error-order tests and counts below describe the reviewed snapshot.
 
 ## Findings
 
 | ID | Severity | Finding | Status |
 |----|----------|---------|--------|
-| F1 | HIGH | Preset allowed a DBC migration fee (`migration_fee_percentage` @247, `creator_migration_fee_percentage` @248) | Fixed in `afb3b3a` |
-| F2 | LOW | Preset did not pin `migration_option` @233 to DAMM v2 | Fixed in `afb3b3a` |
-| F3 | HIGH | Preset allowed `token_update_authority` @246 options that leave a mint authority (3, 4) or metadata authority (0, 2) | Fixed in `9c436c6` |
-| F4 | INFO | Test gaps: the Market raw layout, the full 6000–6023 error order, and spending the market delegation through `sell` were not tested | Fixed in `a3e66f8` (tests only) |
+| F1 | HIGH | Preset allowed a DBC migration fee (`migration_fee_percentage` @247, `creator_migration_fee_percentage` @248) | Fixed in [3656f2f](https://github.com/trucee-fun/trucee-programs/commit/3656f2f); LiteSVM tests in [6535214](https://github.com/trucee-fun/trucee-litesvm-diff/commit/6535214) |
+| F2 | LOW | Preset did not pin `migration_option` @233 to DAMM v2 | Fixed in [3656f2f](https://github.com/trucee-fun/trucee-programs/commit/3656f2f); LiteSVM tests in [6535214](https://github.com/trucee-fun/trucee-litesvm-diff/commit/6535214) |
+| F3 | HIGH | Preset allowed `token_update_authority` @246 options that leave a mint authority (3, 4) or metadata authority (0, 2) | Fixed in [8e93455](https://github.com/trucee-fun/trucee-programs/commit/8e93455); LiteSVM tests in [bccc1f4](https://github.com/trucee-fun/trucee-litesvm-diff/commit/bccc1f4) |
+| F4 | INFO | Test gaps: the Market raw layout, the full 6000–6023 error order, and spending the market delegation through `sell` were not tested | Fixed in [13662fd](https://github.com/trucee-fun/trucee-programs/commit/13662fd) (Rust) and [09faf72](https://github.com/trucee-fun/trucee-litesvm-diff/commit/09faf72) (LiteSVM; tests only) |
 | A1 | LOW | Self-referral is allowed | Accepted |
 | A2 | LOW | The market PDA stays the token delegate after an exit and after graduation | Accepted, app follow-up |
 | A3 | INFO | Partial or revoked approval stops auto-exit | Accepted (only the owner can cause it) |
@@ -26,7 +26,7 @@ This records the reviewed v5 snapshot and its verification results. The current 
 | A5 | INFO | Retention-only fee ownership (`fee_claimer` @40 = Trucee PDA, `creator_trading_fee_percentage` @245 = 0) is not enforced | Not applicable to v5 (Retention preset) |
 | A6 | INFO | The 6023 message does not name the new rules | Accepted, follow-up |
 
-### F1 (HIGH): migration fee: fixed in `afb3b3a`
+### F1 (HIGH): migration fee: fixed in [3656f2f](https://github.com/trucee-fun/trucee-programs/commit/3656f2f)
 
 The earlier preset review rated this MEDIUM. It is raised to HIGH because DBC accepts the maximum.
 
@@ -49,7 +49,7 @@ The earlier preset review rated this MEDIUM. It is raised to HIGH because DBC ac
     - "migration fee 10%", "migration fee 10% with a 50% creator share" and "migration fee 99% with a 100% creator share" all return 6023 and move no funds.
     - "creator migration fee 50% without a migration fee": DBC itself refuses to create this config (InvalidMigratorFeePercentage 6039), so the test patches a default config in LiteSVM. The router returns 6023 and no funds move.
 
-### F2 (LOW): migration option: fixed in `afb3b3a`
+### F2 (LOW): migration option: fixed in [3656f2f](https://github.com/trucee-fun/trucee-programs/commit/3656f2f)
 
 - **What DBC does:** `MigrationOption` has two values: 0 = MetDamm (DAMM v1), 1 = MetDammV2.
   - DBC refuses DAMM v1 for new configs (DeprecatedMigrationOption 6082, shown on LiteSVM).
@@ -60,7 +60,7 @@ The earlier preset review rated this MEDIUM. It is raised to HIGH because DBC ac
   - Rust: `preset::tests::only_damm_v2_migration_follows_the_preset`, covering values 0, 2 and 255.
   - LiteSVM: "migration option DAMM v1" shows DBC's refusal, then a patched config returns 6023 and moves no funds.
 
-### F3 (HIGH): token authority: fixed in `9c436c6`
+### F3 (HIGH): token authority: fixed in [8e93455](https://github.com/trucee-fun/trucee-programs/commit/8e93455)
 
 - **What DBC does:** `TokenAuthorityOption` (SDK 1.5.13) is stored at @246 as `token_update_authority`:
 
@@ -82,7 +82,7 @@ The earlier preset review rated this MEDIUM. It is raised to HIGH because DBC ac
   - Rust: `preset::tests::the_real_dbc_configs_hold_an_immutable_token_authority` and `only_an_immutable_token_authority_follows_the_preset`, covering values 0, 2, 3, 4, 5 and 255.
   - LiteSVM, [src/zpvp_preset.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_preset.ts): "token authority option 0/2/3/4" all return 6023 and move no funds. For 3 and 4 the test also asserts that DBC left the mint authority with the creator or partner. Every config that still opens is asserted to have no mint authority.
 
-### F4 (INFO): test gaps: fixed in `a3e66f8`
+### F4 (INFO): test gaps: fixed in [13662fd](https://github.com/trucee-fun/trucee-programs/commit/13662fd)
 
 The router logic is unchanged; only tests were added. The Rust layout and error-order tests are in [programs/zpvp_router/src/invariant_tests.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/invariant_tests.rs).
 
@@ -215,7 +215,7 @@ The router logic is unchanged; only tests were added. The Rust layout and error-
 
 #### 7. Offsets
 
-- Market is byte-identical to `ec652cc` and is pinned by `invariant_tests::market_raw_bytes_keep_the_offsets_tests_and_clients_read`.
+- Market is byte-identical to [db71df2](https://github.com/trucee-fun/trucee-programs/commit/db71df2) and is pinned by `invariant_tests::market_raw_bytes_keep_the_offsets_tests_and_clients_read`.
 - Position is pinned by `position_layout_appends_auto_exit_deadline`: tokens@72, basis@80, deadline@89, 97 bytes.
 - LiteSVM reads raw on-chain bytes:
   - e2e checks that total_basis@241 equals Σ basis@80;
@@ -223,7 +223,7 @@ The router logic is unchanged; only tests were added. The Rust layout and error-
 
 #### 8. Error code order
 
-- 6000–6018 are identical to `ec652cc`; 6019–6023 are appended.
+- 6000–6018 are identical to [db71df2](https://github.com/trucee-fun/trucee-programs/commit/db71df2); 6019–6023 are appended.
 - Pinned by `invariant_tests::error_codes_6000_to_6023_keep_their_order`.
 
 #### 9. Events
@@ -267,9 +267,9 @@ The router logic is unchanged; only tests were added. The Rust layout and error-
 | 248 | `creator_migration_fee_percentage` | 0–100: creator share of that fee (the partner takes the rest); DBC refuses > 0 when @247 == 0 (6039) | == 0 (F1) |
 | 296 / 328 | `locked_vesting.amount_per_period` / `cliff_unlock_amount` | u64 | == 0 (preset hardening) |
 
-## Verification (final source, `a3e66f8` plus this doc)
+## Verification (final source, [13662fd](https://github.com/trucee-fun/trucee-programs/commit/13662fd) plus this doc)
 
-LiteSVM suites:
+LiteSVM suites at [09faf72](https://github.com/trucee-fun/trucee-litesvm-diff/commit/09faf72):
 
 | Suite | Router build | Command | Result |
 |-------|--------------|---------|--------|
@@ -297,4 +297,4 @@ Other checks:
 - **Devnet configurations:** every v5 devnet config must be DAMM v2, with migration fee 0/0 and an Immutable token authority. The SDK launch preset and the LiteSVM fixture already comply. Markets opened before v5 are not re-checked, because the preset is only checked at `init_market`.
 - **App/SDK (A2):** revoke the market delegate when the deadline is cleared, after a full exit, and at claim.
 - **Router + [src/errors.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/errors.ts) (A6):** optionally widen the 6023 message to name the migration-fee, DAMM v2 and token-authority rules.
-- **Migration fee and migration option fixes:** done in `afb3b3a`.
+- **Migration fee and migration option fixes:** done in [3656f2f](https://github.com/trucee-fun/trucee-programs/commit/3656f2f).

@@ -8,13 +8,14 @@ Apart from the Shipped section, nothing below is live on any network. A roadmap 
 
 ## Shipped
 
-Router v5 is the router on devnet, deployed on 2026-10-11 in slot 509900704. It is also the build pinned for mainnet: source pinned at `3985d1f`, sha256 published (see [Security → Upgrade authority](security.md#upgrade-authority)). Its on-chain features:
+Devnet runs the default build of [trucee-programs main](https://github.com/trucee-fun/trucee-programs), upgraded in slot 510258390: router v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024). The router is 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`; the hook is unchanged, sha256 `1525c836…`. Mainnet is not deployed. The planned release uses these two default builds (see [Security → Upgrade authority](security.md#upgrade-authority) for full hashes and the deployment signature). Its on-chain features:
 
-* **Core:** cost basis per position, exit at cost from a per-market buffer, the surplus split at graduation, and the transfer hook that keeps every pre-graduation trade inside the router.
-* **Auto-Exit:** set a deadline, and if the curve has not graduated by then, anyone can exit your whole position at cost for you.
+* **Core:** cost basis per position, exit at cost before graduation from a per-market buffer (minus the fee at cost and a 2-lamport haircut), the surplus split at graduation, and the transfer hook that keeps every pre-graduation trade inside the router.
+* **Auto-Exit:** set a deadline, and if the curve has not graduated by then, anyone can exit your whole position at cost before graduation for you.
 * **Anti-Whale cap:** no buy may leave one position above 20% of the curve's sale supply.
 * **Native Referral:** a buy may name a referrer (see below).
 * **Preset checks:** `init_market` opens a market only for a config with no creator allocation, dynamic supply, permanently locked liquidity, DAMM v2 migration with no migration fee, and an immutable token authority.
+* **Launch fee cap:** `init_market` rejects static fees above 1% with `FeeTooHigh` (6024). Auto-Exit, the 20% Anti-Whale cap, Native Referral and preset checks are unchanged from v5.
 
 [How it works](how-it-works.md) describes each of them.
 
@@ -26,11 +27,11 @@ DBC pays the referral cut out of the **protocol** fee (20% of the protocol share
 
 ## In progress
 
-The hackathon's on-chain scope is router v5 above. Retention Fee, the last router feature in that scope, was cut before the scope freeze (2026-10-12 12:00 UTC); see [Research](#research). What is still in progress is off-chain:
+The hackathon's on-chain scope is router v5 plus the fee cap above. Retention Fee, the last router feature in that scope, was cut before the scope freeze (2026-10-12 12:00 UTC); see [Research](#research). What is still in progress:
 
 * **Devnet hosting.** The web app and the crank are being set up on AWS for a public devnet demo. Nothing is publicly hosted yet; today they run locally against devnet.
-* **A verifiable mainnet build.** A `solana-verify` build of both programs, so anyone can check the deployed bytes against the source. It is blocked until the owner's build machine is ready. Until then the mainnet release is described as source pinned at `3985d1f`, sha256 published.
-* **Mainnet deploy.** The owner deploys the hook and router v5 to mainnet with the same program IDs as devnet. Neither program is on mainnet yet.
+* **A verifiable mainnet build.** A reproducible `solana-verify` build of both programs is still in progress, so anyone can check deployed bytes against the source. The planned mainnet release uses the current default router and unchanged hook builds listed under [Security → Upgrade authority](security.md#upgrade-authority).
+* **Mainnet deploy.** The planned release uses the current default router with the 1% fee cap and the unchanged hook, with the same program IDs as devnet. Neither program is on mainnet yet.
 
 ## Planned features
 

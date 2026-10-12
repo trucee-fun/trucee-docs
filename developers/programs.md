@@ -9,19 +9,19 @@ description: >-
 
 This page is for anyone who builds transactions for the two Trucee programs or reads their accounts:
 
-* `zpvp_router`, the cost-basis router. It records the cost basis of every buy, refunds exits at cost from a per-market buffer and splits the buffer surplus after graduation.
+* `zpvp_router`, the cost-basis router. It records the cost basis of every buy, refunds exits at cost before graduation from a per-market buffer and splits the buffer surplus after graduation.
 * `zpvp_hook`, the Token-2022 transfer hook. Before graduation it lets the base token move only inside a router instruction.
 
-It documents router v5, the router deployed on devnet. v5 adds Auto-Exit, the Anti-Whale cap, Native Referral and the Zero-PvP preset checks. For the reasoning behind the mechanism, read [How it works](../how-it-works.md). For the invariants, tests and known limits, read [Security](../security.md).
+It documents the current devnet router: v5 plus the 1% launch fee cap. v5 adds Auto-Exit, the Anti-Whale cap, Native Referral and the Zero-PvP preset checks; those features are unchanged. For the reasoning behind the mechanism, read [How it works](../how-it-works.md). For the invariants, tests and known limits, read [Security](../security.md).
 
 Every number on this page names the file, test or command it comes from (see [Sources](#sources)). Source links point to the published repositories. Commands use sibling workspace folders (see the [Introduction](../README.md#source-repositories)). If this page and the code disagree, trust the code.
 
 {% hint style="warning" %}
-**Status as of 2026-10-11:** the programs are not independently reviewed and deployed on devnet only. The devnet router runs router v5 since its upgrade on 2026-10-11, so everything marked **v5** on this page is live on devnet. Mainnet: not deployed.
+**Status as of 2026-10-12:** the programs are not independently reviewed and deployed on devnet only. Devnet runs the default build of [trucee-programs main](https://github.com/trucee-fun/trucee-programs), upgraded in slot 510258390, so everything marked **v5** on this page and the 1% fee cap are live on devnet. Mainnet: not deployed.
 {% endhint %}
 
 {% hint style="info" %}
-**Current source and recorded deployment.** The current source extends router v5 with the 1% static-fee cap (`FeeTooHigh`, 6024). Market remains 274 bytes. The deployment records below describe the earlier pinned v5 build at `3985d1f`; they do not establish deployment of the fee-cap change.
+**Current devnet deployment.** The default router build extends v5 with the 1% static-fee cap (`FeeTooHigh`, 6024). Market remains 274 bytes. The router is 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`, upgraded in slot 510258390 with signature `2x4JHAYtDbvijNiHzv5rDvXjQVPc7hkbW2YbbnUxMGmuUSBTMbUFdtmey9YCWsUqCBGDPsbNMm3qE5N71V9bhQ2y`. The hook is unchanged. The planned mainnet release uses these two default builds; a reproducible `solana-verify` build is still in progress.
 {% endhint %}
 
 {% hint style="info" %}
@@ -32,8 +32,8 @@ Every number on this page names the file, test or command it comes from (see [So
 
 | Program | Program ID | Devnet | Mainnet-beta |
 |---|---|---|---|
-| `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | Deployed: router v5, the capped build of `3985d1f` (sha256 `32d63bde…`, 439,104 bytes), last deployed in slot 509900704 | Not deployed. Release: source pinned at `3985d1f`, sha256 published (`32d63bde…`) |
-| `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | Deployed, unchanged since `ec652cc` | Not deployed. Release: source pinned at `3985d1f`, sha256 published (`1525c836…`) |
+| `zpvp_router` | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` | Deployed: default build, v5 plus the 1% fee cap (sha256 `38b88ec9…`, 439,912 bytes), last deployed in slot 510258390 | Not deployed. Planned release: the current default build (`38b88ec9…`) |
+| `zpvp_hook` | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` | Deployed, unchanged since [db71df2](https://github.com/trucee-fun/trucee-programs/commit/db71df2) (sha256 `1525c836…`) | Not deployed. Planned release: the unchanged default build (`1525c836…`) |
 | Meteora DBC | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` | Meteora's program | Meteora's program |
 
 * **One ID per program on every cluster.** The IDs come from `declare_id!` in each program's [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs). The SDK exports them as `ROUTER_PROGRAM_ID`, `HOOK_PROGRAM_ID` and `DBC_PROGRAM_ID`, and `getClusterConfig()` returns the same three IDs for `devnet`, `mainnet-beta` and `localnet` ([src/constants.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/constants.ts)).
@@ -547,13 +547,14 @@ Messages are verbatim from `#[msg]` in [programs/zpvp_router/src/lib.rs](https:/
 
 ## Sources
 
-Program links point into the published programs repository. The router's unit tests, which pin the layouts, the error order, the preset, the referral rules and the math, were re-run for this page: `cd zpvp && CARGO_BUILD_JOBS=4 cargo test -p zpvp_router` gave **48 passed, 0 failed** on commit `ba6dcb1` (2026-10-11).
+Program links point into the published programs repository. The router's unit tests, which pin the layouts, the error order, the preset, the referral rules and the math, were re-run for this page: `cd zpvp && CARGO_BUILD_JOBS=4 cargo test -p zpvp_router` gave **48 passed, 0 failed** (re-run on 2026-10-11).
 
 | Claim | Source |
 |---|---|
 | Program IDs | `declare_id!` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) and [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs); `DBC_PROGRAM_ID` in [programs/zpvp_router/src/dbc.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/dbc.rs); [src/constants.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/constants.ts) |
-| Devnet runs router v5: the capped build of `3985d1f`, sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5`, 439,104 bytes, last deployed in slot 509900704 | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet`; deploy transaction `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r` (commit `125061c`); [Security → Upgrade authority](../security.md#upgrade-authority) |
-| Historical pinned v5 artifact hashes; current source additionally caps static fees at 1% | [Security → Upgrade authority](../security.md#upgrade-authority) and [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`init_market`, `RouterError`) |
+| Current devnet router: default build of trucee-programs main, v5 plus the 1% fee cap, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`, 439,912 bytes, last deployed in slot 510258390 | `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet`; deploy transaction `2x4JHAYtDbvijNiHzv5rDvXjQVPc7hkbW2YbbnUxMGmuUSBTMbUFdtmey9YCWsUqCBGDPsbNMm3qE5N71V9bhQ2y`; [Security → Upgrade authority](../security.md#upgrade-authority) |
+| Previous devnet build: router v5 (before the fee cap), source [13662fd](https://github.com/trucee-fun/trucee-programs/commit/13662fd), sha256 `32d63bde1e8cc925aad7ce59e1e7b9c50ed5d918dea039b2db060f811905bff5`, 439,104 bytes, upgraded in slot 509900704 | Deploy transaction `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r` (recorded run, commit [0bb9bee](https://github.com/trucee-fun/trucee-litesvm-diff/commit/0bb9bee)); [Security → Upgrade authority](../security.md#upgrade-authority) |
+| Current default router and unchanged hook hashes; previous v5 build recorded separately | [Security → Upgrade authority](../security.md#upgrade-authority) and [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`init_market`, `RouterError`) |
 | SDK scans: Market sizes, the 97-byte Position size, legacy accounts skipped | `fetchAllMarkets`, `fetchPositionsByOwner` and the file header in [src/accounts.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/accounts.ts) |
 | Mainnet deployment remains pending; program IDs are intended to match devnet | [Program IDs](#program-ids) |
 | Quote mints and caps | `QUOTE_CAPS` in [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs); decimals, token programs and clusters in [src/constants.ts](https://github.com/trucee-fun/trucee-sdk/blob/main/src/constants.ts) |

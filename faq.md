@@ -3,7 +3,7 @@
 Short answers to the questions people ask most. The [Introduction](README.md) has the overview, [How it works](how-it-works.md) walks through the mechanism, and [Security](security.md) covers invariants, tests and known limits.
 
 {% hint style="info" %}
-**Status on 2026-10-11.** Trucee runs on Solana devnet and is not deployed on mainnet yet. Answers marked **v5** describe router v5 features, which run on devnet since the router v5 upgrade on 2026-10-11.
+**Status on 2026-10-12.** Trucee runs on Solana devnet and is not deployed on mainnet yet. Devnet now runs router v5 plus the 1% launch fee cap. Answers marked **v5** describe unchanged features that have run on devnet since the router v5 upgrade on 2026-10-11.
 {% endhint %}
 
 ## General
@@ -148,7 +148,7 @@ No. Both programs are not independently reviewed. They have had internal reviews
 * 13,800 randomized fuzz runs of the refund accounting never produced a negative buffer.
 * 36 negative tests cover account substitution, hook bypass and lifecycle abuse.
 * LiteSVM suites run against the real DBC program and cover Auto-Exit, the per-position cap, Native Referral, the preset checks, the launch caps and xStock quotes.
-* On devnet, router v5 passed a 15/15 smoke run, in which the Anti-Whale cap rejected 14 of 40 random trades live. The final end-to-end run on router v5 then walked the whole journey (launch, buys, exit at cost, Auto-Exit, graduation, DAMM v2 migration, surplus claims) and passed 13 of 13 checks.
+* On devnet, router v5 (before the fee cap) passed a 15/15 smoke run, in which the Anti-Whale cap rejected 14 of 40 random trades live. The final end-to-end run on that previous build then walked the whole journey (launch, buys, exit at cost before graduation, Auto-Exit, graduation, DAMM v2 migration, surplus claims) and passed 13 of 13 checks.
 
 An internal security review of router v5 ([Router v5 review](security/router-v5-review.md)) found three preset issues, two of them HIGH. All are fixed in the build on devnet, and none is open. It is not an independent security review. Because the code is not independently reviewed, the default build limits the accepted quote tokens and caps graduation sizes (see [What can I pay with?](#what-can-i-pay-with)). The [Security](security.md) page lists every test suite with its command and latest result.
 
@@ -161,9 +161,9 @@ An internal security review of router v5 ([Router v5 review](security/router-v5-
 | Hook (`zpvp_hook`) | `CUNNV1MqVB53N4jWn91uVFXm1dBSyaynR6iBCbufJWMS` |
 | Router (`zpvp_router`) | `D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb` |
 
-Devnet runs router v5, the capped build with Auto-Exit, the per-position cap, Native Referral and the preset checks. Its upgrade transaction is `4PzU4YFJ2JY26ciZjfCXKVcRUKM8fnYwBGGPrBJrexLTLU86UxnRsPRuHSL4B9FqiUCe8KvooahvKZvxQeVjbS6r`, in slot 509900704. Neither program is deployed on mainnet yet. The mainnet release is router v5 too: source pinned at `3985d1f`, sha256 published (see [Security → Upgrade authority](security.md#upgrade-authority)). For the upgrade authority, see [Is this a honeypot?](#is-this-a-honeypot).
+Devnet runs the default build of [trucee-programs main](https://github.com/trucee-fun/trucee-programs): router v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024). Auto-Exit, the 20% per-position cap, Native Referral and the preset checks are unchanged. The router is 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`. Its upgrade transaction is `2x4JHAYtDbvijNiHzv5rDvXjQVPc7hkbW2YbbnUxMGmuUSBTMbUFdtmey9YCWsUqCBGDPsbNMm3qE5N71V9bhQ2y`, in slot 510258390. The hook is unchanged, sha256 `1525c836…`. Neither program is deployed on mainnet yet. The planned release uses these two default builds; a reproducible `solana-verify` build is still in progress (see [Security → Upgrade authority](security.md#upgrade-authority)). For the upgrade authority, see [Is this a honeypot?](#is-this-a-honeypot).
 
-*Source: [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs) and [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`declare_id!`); `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet` (last deployed in slot 509900704).*
+*Source: [programs/zpvp_hook/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_hook/src/lib.rs) and [programs/zpvp_router/src/lib.rs](https://github.com/trucee-fun/trucee-programs/blob/main/programs/zpvp_router/src/lib.rs) (`declare_id!`); `solana program show D4sk6wwELD6cmd7tv6hE4hkxQP8SF8tjdegYym8iWNNb --url devnet` (last deployed in slot 510258390).*
 
 ## Wallets
 

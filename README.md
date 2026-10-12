@@ -34,9 +34,9 @@ Trucee changes three things before graduation. Everything else is a normal DBC l
 As far as public sources show, no other launchpad on DBC or elsewhere offers a cost-basis exit before graduation. Transfer hooks themselves are common on DBC. Trucee runs on unmodified DBC transfer-hook pools (the router calls DBC's `swap2_with_transfer_hook`), so the same rules can be adopted by any DBC launchpad.
 
 {% hint style="info" %}
-**Live on devnet with router v5.** Router v5 was deployed to devnet on 2026-10-11 (slot 509900704), and it is the router build pinned for mainnet: source pinned at `3985d1f`, sha256 published. Besides the three changes above, router v5 has **Auto-Exit** (set a deadline; if the curve has not completed by then, anyone can trigger your exit at cost and the refund goes to your own account), an **Anti-Whale cap** (a buy may not leave one position above 20% of the curve's base supply, so a curve needs at least five positions to graduate), **Native Referral** (a buy can name a referrer, who gets part of the protocol fee) and **preset checks** (a market opens only for a launch with no creator allocation, permanently locked liquidity and an immutable mint authority).
+**Live on devnet with router v5 plus the 1% launch fee cap.** Devnet runs the default build of [trucee-programs main](https://github.com/trucee-fun/trucee-programs), upgraded in slot 510258390. It adds a 1% static-fee cap (`FeeTooHigh`, 6024) to v5. Besides the three changes above, router v5 has **Auto-Exit** (set a deadline; if the curve has not completed by then, anyone can trigger your exit at cost before graduation and the refund goes to your own account), an **Anti-Whale cap** (a buy may not leave one position above 20% of the curve's base supply, so a curve needs at least five positions to graduate), **Native Referral** (a buy can name a referrer, who gets part of the protocol fee) and **preset checks** (a market opens only for a launch with no creator allocation, permanently locked liquidity and an immutable mint authority). Those v5 features are unchanged.
 
-The current source additionally caps the static fee at 1%; see [Security](security.md#invariants) for how it differs from the recorded build. Retention Fee was cut; Retention Fee is research on the [Roadmap](roadmap.md).
+The current router is 439,912 bytes, sha256 `38b88ec9db9bdec6d3810247d8c54220651fcbf1372585dbd20838594b63f041`; the unchanged hook's hash begins `1525c836…`. Mainnet is not deployed. The planned release uses these two default builds; a reproducible `solana-verify` build is still in progress. The deployment signature and full hashes are under [Security → Upgrade authority](security.md#upgrade-authority). Retention Fee was cut; Retention Fee is research on the [Roadmap](roadmap.md).
 {% endhint %}
 
 ## Proof so far
@@ -44,7 +44,7 @@ The current source additionally caps the static fee at 1%; see [Security](securi
 * A Python port of the DBC curve matches the on-chain program swap for swap (21,000 swaps).
 * 13,800 randomized fuzz runs never produced a negative buffer.
 * 36 negative tests, plus LiteSVM suites for Auto-Exit, the cap, referrals, the preset and the launch caps, all against the real DBC program.
-* The final devnet end-to-end run on router v5 walked the whole journey (launch, buys, exit at cost, Auto-Exit, graduation, DAMM v2 migration, surplus claims) and passed 13 of 13 checks. A separate 15/15 smoke run on router v5 saw the cap reject 14 of 40 random trades live.
+* The final devnet end-to-end run on router v5 (before the fee cap) walked the whole journey (launch, buys, exit at cost before graduation, Auto-Exit, graduation, DAMM v2 migration, surplus claims) and passed 13 of 13 checks. A separate 15/15 smoke run on the same previous build saw the Anti-Whale cap reject 14 of 40 random trades live.
 * Trucee's crank ran unattended on devnet and finalized, migrated and claimed a graduated market on its own.
 
 Commands, limits and known risks are on the [Security](security.md) and [Research & data](research-and-data.md) pages.

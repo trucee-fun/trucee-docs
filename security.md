@@ -3,14 +3,14 @@
 This page covers the rules the two Trucee programs enforce, the tests behind them, how far the code has been reviewed, and the known limits. Every number names the file, command or transaction it comes from. Source links point to the published repositories; commands use the sibling workspace folders shown in the [Introduction](README.md#source-repositories).
 
 {% hint style="warning" %}
-**Status as of 2026-10-11:** the programs are **not independently reviewed** and deployed on **devnet only**. Both are upgradeable, and the upgrade authority is a single key held by the team (see [Upgrade authority](#upgrade-authority)). Mainnet is not deployed yet.
+**Status as of 2026-10-12:** the programs are **not independently reviewed** and deployed on **devnet only**. Both are upgradeable, and the upgrade authority is a single key held by the team (see [Upgrade authority](#upgrade-authority)). Mainnet is not deployed yet.
 {% endhint %}
 
 | Item | Status | Source |
 |---|---|---|
-| Programs | `zpvp_hook` (Token-2022 transfer hook) and `zpvp_router` (cost-basis router), Anchor 0.32.1 | [Anchor.toml](https://github.com/trucee-fun/trucee-programs/blob/main/Anchor.toml), [programs/](https://github.com/trucee-fun/trucee-programs/blob/main/programs/) |
-| Deployed | Devnet only. The devnet router runs router v5, the capped build of commit `3985d1f`, with Auto-Exit, the Anti-Whale cap, Native Referral and the preset checks. | `solana program show`; [Upgrade authority](#upgrade-authority) |
-| Mainnet release | Not deployed. Source pinned at `3985d1f`, sha256 published: router `32d63bde…`, hook `1525c836…` (full hashes under [Upgrade authority](#upgrade-authority)) | [Upgrade authority](#upgrade-authority) |
+| Programs | `zpvp_hook` (Token-2022 transfer hook) and `zpvp_router` (cost-basis router), Anchor 0.32.1 | [Anchor.toml](https://github.com/trucee-fun/trucee-programs/blob/main/Anchor.toml), [programs/](https://github.com/trucee-fun/trucee-programs/tree/main/programs/) |
+| Deployed | Devnet only. The router runs the default build of trucee-programs main: v5 plus the 1% launch fee cap (`FeeTooHigh`, 6024), 439,912 bytes, sha256 `38b88ec9…`, upgraded in slot 510258390. Auto-Exit, the Anti-Whale 20% cap, Native Referral and preset checks are unchanged. | `solana program show`; [Upgrade authority](#upgrade-authority) |
+| Mainnet release | Not deployed. Planned release: the current default router (`38b88ec9…`) and unchanged hook (`1525c836…`). A reproducible `solana-verify` build is still in progress. | [Upgrade authority](#upgrade-authority) |
 | Independent security review | None | — |
 | Internal review of router v5 | Done: three preset findings fixed, none open. Not an independent security review | [Review status](#review-status) |
 
@@ -41,7 +41,7 @@ What you still have to trust is the upgrade authority. An upgrade could change a
 - The authority is one team-held keypair, not a multisig.
 - The program IDs are fixed in code: the hook accepts only `D4sk6w…` as the router (`ROUTER_ID`), and the router opens markets only for pools whose hook is `CUNNV1…` (`ZPVP_HOOK_ID`).
 
-The current source adds a static-fee cap to the recorded v5 build: `init_market` rejects a config above **1%** (100 bps, fee numerator 10,000,000) with `FeeTooHigh` (**6024**, "Config fee is above the 1% cap"). Until graduation, the floor is basis minus the fee at cost (at most 1%, rounded up to a raw quote unit) minus the **2-lamport haircut**, floored at zero. This cap applies when a market opens; markets opened before it (on devnet, before slot 510258390) are not re-checked. The LiteSVM suite [src/zpvp_caps.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_caps.ts) probes exactly 1% (accepted) and one fee-numerator unit above (rejected with 6024).
+The current devnet router adds a static-fee cap to the recorded v5 build: `init_market` rejects a config above **1%** (100 bps, fee numerator 10,000,000) with `FeeTooHigh` (**6024**, "Config fee is above the 1% cap"). Until graduation, the floor is basis minus the fee at cost (at most 1%, rounded up to a raw quote unit) minus the **2-lamport haircut**, floored at zero. This cap applies when a market opens; markets opened before it (on devnet, before slot 510258390) are not re-checked. The LiteSVM suite [src/zpvp_caps.ts](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/src/zpvp_caps.ts) probes exactly 1% (accepted) and one fee-numerator unit above (rejected with 6024).
 
 ## Invariants
 
@@ -66,13 +66,13 @@ Engineering rules for every change: keep instruction names, account order, discr
 
 ## Test and fuzz evidence
 
-Every command below was re-run on commit `ba6dcb1` (2026-10-11), except the two devnet runs, which send devnet transactions and are recorded runs. Commands run from `zpvp/` (Rust), `litesvm-diff/` (LiteSVM), `sdk/`, `app/` and `worker/` (TypeScript) or `sim/` (Python).
+Every command below was re-run on 2026-10-11, except the two devnet runs, which send devnet transactions and are recorded runs. Commands run from `zpvp/` (Rust), `litesvm-diff/` (LiteSVM), `sdk/`, `app/` and `worker/` (TypeScript) or `sim/` (Python).
 
 {% hint style="warning" %}
 **Required first step for the LiteSVM suites and the SDK tests: `cd litesvm-diff && bash scripts/fetch-dbc.sh`.** The LiteSVM suites and the SDK's LiteSVM tests load Meteora's real DBC program from `programs/dbc.so` (downloaded with [scripts/fetch-dbc.sh](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/scripts/fetch-dbc.sh)), which is not in the repository: the DBC program is under Meteora's own licence, so we do not redistribute it. The script dumps the mainnet and devnet DBC programs with `solana program dump` (read-only, public RPC, no keypair) and prints their sha256. The SDK's LiteSVM tests also load the routers built by `cd zpvp && cargo build-sbf`.
 {% endhint %}
 
-The LiteSVM commands run in `litesvm-diff/` with the router and hook binaries committed in [programs/](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/programs/), using the commands below:
+The LiteSVM commands run in `litesvm-diff/` with the router and hook binaries committed in [programs/](https://github.com/trucee-fun/trucee-litesvm-diff/tree/main/programs/), using the commands below:
 
 ```bash
 cd litesvm-diff
@@ -81,7 +81,7 @@ npm ci
 export HOOK_SO=programs/zpvp_hook.so      # then run the commands in the table
 ```
 
-`ROUTER_SO` picks the router: `programs/router_unrestricted.so` is built with the test-only `unrestricted` feature, so tests can use fresh quote mints, and `programs/router_capped.so` is the default (capped) build, the one deployed on devnet. Both are built from trucee-programs with `cargo build-sbf` (add `--features unrestricted` for the first) and copied into `programs/`.
+`ROUTER_SO` picks the router: `programs/router_unrestricted.so` is built with the test-only `unrestricted` feature, so tests can use fresh quote mints, and `programs/router_capped.so` is the default (capped) build. Both are built from trucee-programs with `cargo build-sbf` (add `--features unrestricted` for the first) and copied into `programs/`. The recorded runs below used router v5 (before the fee cap); the current devnet build is listed under [Upgrade authority](#upgrade-authority).
 
 | Suite | What it checks | Command | Result |
 |---|---|---|---|
@@ -97,8 +97,8 @@ export HOOK_SO=programs/zpvp_hook.so      # then run the commands in the table
 | SDK | Instruction builders, account and event decoders, error decoding, quotes, the launch preset and launch resume, including LiteSVM tests against the real DBC program | `cd zpvp && cargo build-sbf`, then `cd sdk && npm ci && npx vitest run` | 15 files, 383 tests passed. Workspace CI excludes the LiteSVM tests and prints a SKIPPED line if router binaries are missing; build them before running the SDK suite |
 | Web app | Trade panel, Auto-Exit and revoke, claims, launch flow, API routes (RPC proxy, metadata, rate limits) | `cd app && npm ci && npx vitest run` | 41 files, 1,522 tests passed |
 | Crank (worker) | Every job (finalize, migrate, claims, Auto-Exit), job registration, config guards | `cd worker && npm ci && npx vitest run` | 7 files, 250 tests passed |
-| End to end (devnet), smoke | The LiteSVM end-to-end checks against live devnet, wSOL quote, on the deployed router v5 | `npx tsx src/zpvp_e2e.ts out/scenario_tiny.json 0 out/e2e_devnet_v6.json --rpc env --wsol --ops 40 --buy-scale 0.005` (recorded run, commit `125061c`; output [out/e2e_devnet_v6.json](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/out/e2e_devnet_v6.json)) | 15 PASS, 0 FAIL. 14 of the 40 random trades were rejected live with 6022 |
-| End to end (devnet), final journey | Launch through the SDK, buys, floor, exit at cost, hook rejections, the cap, Auto-Exit by the crank, graduation, finalize, DAMM v2 migration and claims by the crank's jobs, a free transfer after graduation | `cd worker && npx tsx scripts/e2e-devnet.ts` (recorded run, commit `99c8a42`. The script writes [out/e2e-devnet.json](https://github.com/trucee-fun/trucee-worker/blob/main/out/e2e-devnet.json); the final output is kept as [out/e2e-devnet-final.json](https://github.com/trucee-fun/trucee-worker/blob/main/out/e2e-devnet-final.json)) | 13 passed, 0 failed |
+| End to end (devnet), smoke | The LiteSVM end-to-end checks against live devnet, wSOL quote, on router v5 (before the fee cap) | `npx tsx src/zpvp_e2e.ts out/scenario_tiny.json 0 out/e2e_devnet_v6.json --rpc env --wsol --ops 40 --buy-scale 0.005` (recorded run, commit [0bb9bee](https://github.com/trucee-fun/trucee-litesvm-diff/commit/0bb9bee); output [out/e2e_devnet_v6.json](https://github.com/trucee-fun/trucee-litesvm-diff/blob/main/out/e2e_devnet_v6.json)) | 15 PASS, 0 FAIL. 14 of the 40 random trades were rejected live with 6022 |
+| End to end (devnet), final journey | Router v5 (before the fee cap): launch through the SDK, buys, floor until graduation, exit at cost before graduation, hook rejections, the cap, Auto-Exit by the crank, graduation, finalize, DAMM v2 migration and claims by the crank's jobs, a free transfer after graduation | `cd worker && npx tsx scripts/e2e-devnet.ts` (recorded run, commit [0c6f40e](https://github.com/trucee-fun/trucee-worker/commit/0c6f40e). The script writes [out/e2e-devnet.json](https://github.com/trucee-fun/trucee-worker/blob/main/out/e2e-devnet.json); the final output is kept as [out/e2e-devnet-final.json](https://github.com/trucee-fun/trucee-worker/blob/main/out/e2e-devnet-final.json)) | 13 passed, 0 failed |
 | DBC port, differential | The Python port of the DBC curve against the real DBC program: amount in, amount out, resulting price and reserve, per swap | `cd sim && python3 replay_diff.py ../litesvm-diff/out/results.json` and the same with `results_b.json` | 9,000 + 12,000 = 21,000 swaps, 0 mismatches |
 | Solvency fuzz | Router buffer at every step: 3 lot modes × (random, greedy adversary) × (stop at graduation, or a dead curve where everyone exits), with the on-chain constants (16 lamports per buy, 2 per exit) | `cd sim && python3 run_fuzz.py --random 300 --adversarial 60 --seed 777 --haircut 2 --dust-per-buy 16` | 2,160 runs in 12 sections, every section "runs with buffer < 0 at any step : 0" |
 | Simulator unit tests | Round trips, early exits never profit, tiny-slice drain attack, random orderings stay solvent | `cd sim && python3 -m unittest test_sim` | 8 tests, OK |
