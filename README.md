@@ -61,12 +61,12 @@ Commands, limits and known risks are on the [Security](security.md) and [Researc
 
 ## Source repositories
 
-Each repository is published separately. Clone them side by side under these folder names so relative dependencies and reproduction commands work:
+Each repository is published separately, with an overview at [trucee-fun/trucee](https://github.com/trucee-fun/trucee). The SDK, simulator, LiteSVM, crank and docs repositories are public; the programs and the web app are private for now. Clone them side by side under these folder names so relative dependencies and reproduction commands work:
 
 | Folder | Repository | Contents |
 | --- | --- | --- |
 | `zpvp` | [trucee-programs](https://github.com/trucee-fun/trucee-programs) | Router and transfer-hook programs |
-| `sdk` | [trucee-sdk](https://github.com/trucee-fun/trucee-sdk) | TypeScript SDK |
+| `sdk` | [trucee-sdk](https://github.com/trucee-fun/trucee-sdk) | TypeScript SDK, also on npm as [`@trucee/sdk`](https://www.npmjs.com/package/@trucee/sdk) |
 | `app` | [trucee-app](https://github.com/trucee-fun/trucee-app) | Web app |
 | `sim` | [trucee-sim](https://github.com/trucee-fun/trucee-sim) | Python model and fuzz runner |
 | `worker` | [trucee-worker](https://github.com/trucee-fun/trucee-worker) | Permissionless crank |

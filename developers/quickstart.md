@@ -19,7 +19,7 @@ It reads accounts and builds and signs transactions in memory. It never sends a 
 The file is [examples/quickstart.ts](https://github.com/trucee-fun/trucee-docs/blob/main/examples/quickstart.ts), and this page embeds it verbatim. It typechecks against the SDK's public API with `cd sdk && npm ci && cd ../gitbook/examples && npm ci && npx tsc --noEmit`.
 
 {% hint style="warning" %}
-**Status:** the Trucee programs run on Solana mainnet (since 2026-10-12) and devnet, with the same program IDs. They are not independently reviewed. The SDK source is public at [trucee-fun/trucee-sdk](https://github.com/trucee-fun/trucee-sdk). `@trucee/sdk` is not on the npm registry yet, so for now you install it from a checkout of that repository (see [Links](../links.md)).
+**Status:** the Trucee programs run on Solana mainnet (since 2026-10-12) and devnet, with the same program IDs. They are not independently reviewed. `@trucee/sdk` is on [npm](https://www.npmjs.com/package/@trucee/sdk), and its source is public at [trucee-fun/trucee-sdk](https://github.com/trucee-fun/trucee-sdk).
 {% endhint %}
 
 {% hint style="info" %}
@@ -30,17 +30,23 @@ The SDK also has Auto-Exit builders (`setAutoExitInstructions` and `autoExitInst
 
 ## Install
 
-Clone the repositories side by side using the [workspace layout](../README.md#source-repositories). You need Node.js 22.18 or later: the example runs the `.ts` file directly with Node's built-in type stripping, so it needs no TypeScript runner.
-
-From the workspace folder that contains `sdk/` and `gitbook/`, install the SDK's own dependencies first. `npm ci` in `sdk/` also builds the SDK's `dist/` folder (its `prepare` script), which is what your project imports.
+Add the SDK and its peer dependencies to your project:
 
 ```bash
-cd sdk && npm ci && cd ..
+npm install @trucee/sdk @solana/web3.js @solana/spl-token @meteora-ag/dynamic-bonding-curve-sdk bn.js buffer
 ```
 
-Then install, typecheck and run the example:
+* The Solana and Meteora packages are peer dependencies, so your project and the SDK share one copy of each.
+* The SDK is an ES module (`"type": "module"` with import-only `exports`), so import it from ES module code or through a bundler.
+* `getClusterConfig('mainnet-beta')` and `getClusterConfig('devnet')` return the same program IDs; mainnet quotes in SOL, TSLAx and NVDAx, devnet in SOL only.
+* Every token and quote amount in the SDK is a `bigint` in raw base units (lamports for SOL).
+
+### Run the example from source
+
+The example below builds against the SDK's source. Clone [trucee-sdk](https://github.com/trucee-fun/trucee-sdk) as `sdk/` and [trucee-docs](https://github.com/trucee-fun/trucee-docs) as `gitbook/`, side by side (the [workspace layout](../README.md#source-repositories)). You need Node.js 22.18 or later: the example runs the `.ts` file directly with Node's built-in type stripping, so it needs no TypeScript runner.
 
 ```bash
+cd sdk && npm ci && cd ..                # also builds the SDK's dist/ (its prepare script)
 cd gitbook/examples
 npm ci
 npx tsc --noEmit                         # or: npm run typecheck
@@ -48,31 +54,7 @@ npm run quickstart                       # reads devnet, sends nothing
 npm run quickstart -- <wallet address>   # also shows that wallet's floor and builds its exit
 ```
 
-The example's `.npmrc` sets `install-links=true`, so `npm ci` installs the SDK as a packed copy, not as a symlink: npm packs the `sdk/` folder (running its `prepare` build) and copies the result into `node_modules/@trucee/sdk`. The SDK's own imports, such as `@solana/web3.js`, then resolve from the example's `node_modules`, so the script loads one copy of each. After you change the SDK, run `npm ci` in `gitbook/examples` again: a plain `npm install` reports "up to date" and keeps the old copy.
-
-### In your own project
-
-Depend on the SDK folder and install its peer dependencies yourself, on the ranges in [package.json](https://github.com/trucee-fun/trucee-sdk/blob/main/package.json):
-
-```json
-{
-  "type": "module",
-  "dependencies": {
-    "@trucee/sdk": "file:../sdk",
-    "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.13",
-    "@solana/spl-token": "^0.4.15",
-    "@solana/web3.js": "^1.99.0",
-    "bn.js": "^5.2.5",
-    "buffer": "^6.0.3"
-  }
-}
-```
-
-* The SDK is an ES module (`"type": "module"` with import-only `exports`), so import it from ES module code or through a bundler.
-* Install the SDK as a packed copy, as the example does: put `install-links=true` in your project's `.npmrc` (npm 9 or later), and run `npm ci` in `sdk/` before your own `npm ci`. Re-run your `npm ci` after every SDK change.
-* Without `install-links`, npm installs a `file:` dependency as a symlink. Node and TypeScript then resolve the SDK's own imports (`@solana/web3.js` and its other peers) from the SDK folder's `node_modules`, so your script can load two copies of `@solana/web3.js`. The SDK's builders accept public keys from either copy, but an `instanceof` check between an SDK object and your own import fails.
-* The example's `tsconfig.json` sets `preserveSymlinks` and its `quickstart` script runs Node with `--preserve-symlinks`. They only matter for a symlinked SDK and do nothing with the packed copy.
-* Every token and quote amount in the SDK is a `bigint` in raw base units (lamports for SOL).
+The example's `.npmrc` sets `install-links=true`, so `npm ci` installs the SDK as a packed copy of `sdk/`, not as a symlink, and the script loads one copy of `@solana/web3.js`. After you change the SDK, run `npm ci` in `gitbook/examples` again.
 
 ## The example
 
