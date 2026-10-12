@@ -547,7 +547,7 @@ Messages are verbatim from `#[msg]` in [programs/zpvp_router/src/lib.rs](https:/
 
 ## Sources
 
-Program links point into the published programs repository. The router's unit tests, which pin the layouts, the error order, the preset, the referral rules and the math, were re-run for this page: `cd zpvp && CARGO_BUILD_JOBS=4 cargo test -p zpvp_router` gave **48 passed, 0 failed** (re-run on 2026-10-11).
+Program links point into the published programs repository. The router's unit tests, which pin the layouts, the error order, the preset, the referral rules and the math, were re-run for this page: `cd zpvp && CARGO_BUILD_JOBS=4 cargo test -p zpvp_router` gave **50 passed, 0 failed** (re-run on 2026-10-12).
 
 | Claim | Source |
 |---|---|
